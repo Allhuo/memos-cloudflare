@@ -1,0 +1,40 @@
+name: 🐛 Bug 报告 / Bug Report
+description: 部署失败、接口报错、前端异常 / Deployment failures, API errors, frontend glitches
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: 问题描述 / What happened
+      description: 发生了什么？预期是什么？/ What happened and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 复现步骤 / Steps to reproduce
+      placeholder: |
+        1. 执行 npx wrangler d1 execute ...
+        2. 打开前端登录页
+        3. 报错 ...
+    validations:
+      required: true
+  - type: dropdown
+    id: component
+    attributes:
+      label: 涉及组件 / Component
+      options:
+        - 后端 Worker / Backend
+        - 前端 Pages / Frontend
+        - 数据库 D1 / Database
+        - 存储 R2 / Storage
+        - 部署流程 / Deployment
+        - 其他 / Other
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: 相关日志 / Relevant logs
+      description: wrangler tail 输出、浏览器控制台报错等 / wrangler tail output, browser console errors, etc.
+      render: shell
