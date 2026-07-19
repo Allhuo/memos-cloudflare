@@ -94,8 +94,10 @@ CREATE INDEX idx_memo_uid ON memo (uid);
 CREATE INDEX idx_resource_uid ON resource (uid);
 
 
-INSERT INTO user (uid, username, password_hash, nickname, role, row_status) 
-VALUES ('admin-uid-12345', 'admin', '$2b$10$9XZw8vPzF6EQRKQJZr8U4OyIo8hC2VL.KKFJJBb8iP4oJm5mZw7Ke', 'Administrator', 'HOST', 'NORMAL');
+-- 默认管理员账号 admin / 123456（password_hash 为 "123456" 的 SHA-256 值，与后端校验逻辑一致）
+-- ⚠️ 部署后请立即修改默认密码
+INSERT INTO user (uid, username, password_hash, nickname, role, row_status)
+VALUES ('admin-uid-12345', 'admin', '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92', 'Administrator', 'HOST', 'NORMAL');
 
 INSERT INTO memo (uid, creator_id, content, visibility, row_status) 
 VALUES ('memo-uid-12345', 1, '欢迎使用 Memos Cloudflare 版本！\n\n这是一个基于 Cloudflare Workers + D1 + R2 的 Memos 部署。\n\n功能特点：\n- 🚀 无服务器架构\n- 💾 D1 数据库存储\n- 📦 R2 对象存储\n- 🔒 JWT 身份验证\n- 🌐 全球边缘部署', 'PUBLIC', 'NORMAL'); 
