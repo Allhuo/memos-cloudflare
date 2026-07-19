@@ -1,36 +1,80 @@
 import "@github/relative-time-element";
-import { CssVarsProvider } from "@mui/joy";
-import { observer } from "mobx-react-lite";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
+import React, { useEffect, useRef } from "react";
 import { createRoot } from "react-dom/client";
 import { Toaster } from "react-hot-toast";
 import { RouterProvider } from "react-router-dom";
 import "./i18n";
+import "./index.css";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { refreshAccessToken } from "@/connect";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { InstanceProvider, useInstance } from "@/contexts/InstanceContext";
+import { ViewProvider } from "@/contexts/ViewContext";
+import { useLiveMemoRefresh } from "@/hooks/useLiveMemoRefresh";
+import { useTokenRefreshOnFocus } from "@/hooks/useTokenRefreshOnFocus";
+import { queryClient } from "@/lib/query-client";
 import router from "./router";
-import { initialUserStore } from "./store/v2/user";
-import { initialWorkspaceStore } from "./store/v2/workspace";
-import "./style.css";
-import theme from "./theme";
-import "@usememos/mui/theme.css";
-import "leaflet/dist/leaflet.css";
+import { applyLocaleEarly } from "./utils/i18n";
+import { applyThemeEarly } from "./utils/theme";
 
-// Version identification for deployment debugging
-const BUILD_VERSION = "v2025-07-11-13:12:00";
-const BUILD_COMMIT = "3bb4fd6";
-console.log(`🚀 Memos Frontend ${BUILD_VERSION} (${BUILD_COMMIT})`);
-console.log(`📅 Build Time: ${new Date().toISOString()}`);
+// Apply theme and locale early to prevent flash
+applyThemeEarly();
+applyLocaleEarly();
 
-const Main = observer(() => (
-  <CssVarsProvider theme={theme}>
-    <RouterProvider router={router} />
-    <Toaster position="top-right" toastOptions={{ className: "dark:bg-zinc-700 dark:text-gray-300" }} />
-  </CssVarsProvider>
-));
+// Inner component that initializes contexts
+function AppInitializer({ children }: { children: React.ReactNode }) {
+  const { isInitialized: authInitialized, initialize: initAuth, currentUser } = useAuth();
+  const { isInitialized: instanceInitialized, initialize: initInstance } = useInstance();
+  const initStartedRef = useRef(false);
 
-(async () => {
-  await initialWorkspaceStore();
-  await initialUserStore();
+  // Initialize on mount - run in parallel for better performance
+  useEffect(() => {
+    if (initStartedRef.current) return;
+    initStartedRef.current = true;
 
-  const container = document.getElementById("root");
-  const root = createRoot(container as HTMLElement);
-  root.render(<Main />);
-})();
+    const init = async () => {
+      await Promise.all([initInstance(), initAuth()]);
+    };
+    init();
+  }, [initAuth, initInstance]);
+
+  // Proactively refresh token on window focus to prevent 401 errors
+  // Only enabled when user is authenticated
+  // Related: https://github.com/usememos/memos/issues/5589
+  useTokenRefreshOnFocus(refreshAccessToken, !!currentUser);
+
+  // Live refresh: listen for memo changes via SSE and invalidate caches.
+  useLiveMemoRefresh();
+
+  if (!authInitialized || !instanceInitialized) {
+    return null;
+  }
+
+  return <>{children}</>;
+}
+
+function Main() {
+  return (
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <InstanceProvider>
+          <AuthProvider>
+            <ViewProvider>
+              <AppInitializer>
+                <RouterProvider router={router} />
+                <Toaster position="top-right" />
+              </AppInitializer>
+            </ViewProvider>
+          </AuthProvider>
+        </InstanceProvider>
+        <ReactQueryDevtools initialIsOpen={false} />
+      </QueryClientProvider>
+    </ErrorBoundary>
+  );
+}
+
+const container = document.getElementById("root");
+const root = createRoot(container as HTMLElement);
+root.render(<Main />);

@@ -1,136 +1,146 @@
-import { Button } from "@/components/ui/mui";
+import { timestampDate } from "@bufbuild/protobuf/wkt";
 import copy from "copy-to-clipboard";
-import { ClipboardIcon, TrashIcon } from "lucide-react";
+import { PlusIcon, TrashIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "react-hot-toast";
-import { userServiceClient } from "@/grpcweb";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import { Button } from "@/components/ui/button";
+import { userServiceClient } from "@/connect";
 import useCurrentUser from "@/hooks/useCurrentUser";
-import { UserAccessToken } from "@/types/proto/api/v1/user_service";
+import { useDialog } from "@/hooks/useDialog";
+import { handleError } from "@/lib/error";
+import { CreatePersonalAccessTokenResponse, PersonalAccessToken } from "@/types/proto/api/v1/user_service_pb";
 import { useTranslate } from "@/utils/i18n";
-import showCreateAccessTokenDialog from "../CreateAccessTokenDialog";
-import LearnMore from "../LearnMore";
+import CreateAccessTokenDialog from "../CreateAccessTokenDialog";
+import SettingGroup from "./SettingGroup";
+import SettingTable from "./SettingTable";
 
-const listAccessTokens = async (name: string) => {
-  const { accessTokens } = await userServiceClient.listUserAccessTokens({ name });
-  return accessTokens.sort((a, b) => (b.issuedAt?.getTime() ?? 0) - (a.issuedAt?.getTime() ?? 0));
+const listAccessTokens = async (parent: string) => {
+  const { personalAccessTokens } = await userServiceClient.listPersonalAccessTokens({ parent });
+  return personalAccessTokens.sort(
+    (a, b) =>
+      ((b.createdAt ? timestampDate(b.createdAt) : undefined)?.getTime() ?? 0) -
+      ((a.createdAt ? timestampDate(a.createdAt) : undefined)?.getTime() ?? 0),
+  );
 };
 
 const AccessTokenSection = () => {
   const t = useTranslate();
   const currentUser = useCurrentUser();
-  const [userAccessTokens, setUserAccessTokens] = useState<UserAccessToken[]>([]);
+  const [personalAccessTokens, setPersonalAccessTokens] = useState<PersonalAccessToken[]>([]);
+  const createTokenDialog = useDialog();
+  const [deleteTarget, setDeleteTarget] = useState<PersonalAccessToken | undefined>(undefined);
 
   useEffect(() => {
-    listAccessTokens(currentUser.name).then((accessTokens) => {
-      setUserAccessTokens(accessTokens);
-    });
-  }, []);
+    if (!currentUser?.name) return;
+    let canceled = false;
+    listAccessTokens(currentUser.name)
+      .then((tokens) => {
+        if (!canceled) {
+          setPersonalAccessTokens(tokens);
+        }
+      })
+      .catch((error: unknown) => {
+        if (!canceled) {
+          handleError(error, toast.error, { context: "List access tokens" });
+        }
+      });
+    return () => {
+      canceled = true;
+    };
+  }, [currentUser?.name]);
 
-  const handleCreateAccessTokenDialogConfirm = async () => {
-    const accessTokens = await listAccessTokens(currentUser.name);
-    setUserAccessTokens(accessTokens);
-  };
-
-  const copyAccessToken = (accessToken: string) => {
-    copy(accessToken);
-    toast.success(t("setting.access-token-section.access-token-copied-to-clipboard"));
-  };
-
-  const handleDeleteAccessToken = async (accessToken: string) => {
-    const formatedAccessToken = getFormatedAccessToken(accessToken);
-    const confirmed = window.confirm(t("setting.access-token-section.access-token-deletion", { accessToken: formatedAccessToken }));
-    if (confirmed) {
-      await userServiceClient.deleteUserAccessToken({ name: currentUser.name, accessToken: accessToken });
-      setUserAccessTokens(userAccessTokens.filter((token) => token.accessToken !== accessToken));
+  const handleCreateAccessTokenDialogConfirm = async (response: CreatePersonalAccessTokenResponse) => {
+    const tokens = await listAccessTokens(currentUser?.name ?? "");
+    setPersonalAccessTokens(tokens);
+    // Copy the token to clipboard - this is the only time it will be shown
+    if (response.token) {
+      copy(response.token);
+      toast.success(t("setting.access-token.access-token-copied-to-clipboard"));
     }
+    toast.success(
+      t("setting.access-token.create-dialog.access-token-created", {
+        description: response.personalAccessToken?.description ?? "",
+      }),
+    );
   };
 
-  const getFormatedAccessToken = (accessToken: string) => {
-    return `${accessToken.slice(0, 4)}****${accessToken.slice(-4)}`;
+  const handleDeleteAccessToken = (token: PersonalAccessToken) => {
+    setDeleteTarget(token);
+  };
+
+  const confirmDeleteAccessToken = async () => {
+    if (!deleteTarget) return;
+    const { name: tokenName, description } = deleteTarget;
+    await userServiceClient.deletePersonalAccessToken({ name: tokenName });
+    setPersonalAccessTokens((prev) => prev.filter((token) => token.name !== tokenName));
+    setDeleteTarget(undefined);
+    toast.success(t("setting.access-token.access-token-deleted", { description }));
   };
 
   return (
-    <div className="mt-6 w-full flex flex-col justify-start items-start space-y-4">
-      <div className="w-full">
-        <div className="sm:flex sm:items-center sm:justify-between">
-          <div className="sm:flex-auto space-y-1">
-            <p className="flex flex-row justify-start items-center font-medium text-gray-700 dark:text-gray-400">
-              {t("setting.access-token-section.title")}
-              <LearnMore className="ml-2" url="https://usememos.com/docs/security/access-tokens" />
-            </p>
-            <p className="text-sm text-gray-700 dark:text-gray-500">{t("setting.access-token-section.description")}</p>
-          </div>
-          <div className="mt-4 sm:mt-0">
-            <Button
-              color="primary"
-              onClick={() => {
-                showCreateAccessTokenDialog(handleCreateAccessTokenDialogConfirm);
-              }}
-            >
-              {t("common.create")}
-            </Button>
-          </div>
-        </div>
-        <div className="w-full mt-2 flow-root">
-          <div className="overflow-x-auto">
-            <div className="inline-block min-w-full border border-zinc-200 rounded-lg align-middle dark:border-zinc-600">
-              <table className="min-w-full divide-y divide-gray-300 dark:divide-zinc-600">
-                <thead>
-                  <tr>
-                    <th scope="col" className="px-3 py-2 text-left text-sm font-semibold text-gray-900 dark:text-gray-400">
-                      {t("setting.access-token-section.token")}
-                    </th>
-                    <th scope="col" className="py-2 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 dark:text-gray-400">
-                      {t("common.description")}
-                    </th>
-                    <th scope="col" className="px-3 py-2 text-left text-sm font-semibold text-gray-900 dark:text-gray-400">
-                      {t("setting.access-token-section.create-dialog.created-at")}
-                    </th>
-                    <th scope="col" className="px-3 py-2 text-left text-sm font-semibold text-gray-900 dark:text-gray-400">
-                      {t("setting.access-token-section.create-dialog.expires-at")}
-                    </th>
-                    <th scope="col" className="relative py-3.5 pl-3 pr-4">
-                      <span className="sr-only">{t("common.delete")}</span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200 dark:divide-zinc-700">
-                  {userAccessTokens.map((userAccessToken) => (
-                    <tr key={userAccessToken.accessToken}>
-                      <td className="whitespace-nowrap px-3 py-2 text-sm text-gray-900 dark:text-gray-400 flex flex-row justify-start items-center gap-x-1">
-                        <span className="font-mono">{getFormatedAccessToken(userAccessToken.accessToken)}</span>
-                        <Button variant="plain" onClick={() => copyAccessToken(userAccessToken.accessToken)}>
-                          <ClipboardIcon className="w-4 h-auto text-gray-400" />
-                        </Button>
-                      </td>
-                      <td className="whitespace-nowrap py-2 pl-4 pr-3 text-sm text-gray-900 dark:text-gray-400">
-                        {userAccessToken.description}
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
-                        {userAccessToken.issuedAt?.toLocaleString()}
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
-                        {userAccessToken.expiresAt?.toLocaleString() ?? t("setting.access-token-section.create-dialog.duration-never")}
-                      </td>
-                      <td className="relative whitespace-nowrap py-2 pl-3 pr-4 text-right text-sm">
-                        <Button
-                          variant="plain"
-                          onClick={() => {
-                            handleDeleteAccessToken(userAccessToken.accessToken);
-                          }}
-                        >
-                          <TrashIcon className="text-red-600 w-4 h-auto" />
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <SettingGroup
+      title={t("setting.access-token.title")}
+      description={t("setting.access-token.description")}
+      actions={
+        <Button onClick={createTokenDialog.open} size="sm">
+          <PlusIcon className="w-4 h-4 mr-1.5" />
+          {t("common.create")}
+        </Button>
+      }
+    >
+      <SettingTable
+        columns={[
+          {
+            key: "description",
+            header: t("common.description"),
+            render: (_, token: PersonalAccessToken) => <span className="text-foreground">{token.description}</span>,
+          },
+          {
+            key: "createdAt",
+            header: t("setting.access-token.create-dialog.created-at"),
+            render: (_, token: PersonalAccessToken) => (token.createdAt ? timestampDate(token.createdAt) : undefined)?.toLocaleString(),
+          },
+          {
+            key: "expiresAt",
+            header: t("setting.access-token.create-dialog.expires-at"),
+            render: (_, token: PersonalAccessToken) =>
+              (token.expiresAt ? timestampDate(token.expiresAt) : undefined)?.toLocaleString() ??
+              t("setting.access-token.create-dialog.duration-never"),
+          },
+          {
+            key: "actions",
+            header: "",
+            className: "text-right",
+            render: (_, token: PersonalAccessToken) => (
+              <Button variant="ghost" size="sm" onClick={() => handleDeleteAccessToken(token)}>
+                <TrashIcon className="text-destructive w-4 h-auto" />
+              </Button>
+            ),
+          },
+        ]}
+        data={personalAccessTokens}
+        emptyMessage={t("setting.access-token.no-tokens-found")}
+        getRowKey={(token) => token.name}
+      />
+
+      {/* Create Access Token Dialog */}
+      <CreateAccessTokenDialog
+        open={createTokenDialog.isOpen}
+        onOpenChange={createTokenDialog.setOpen}
+        onSuccess={handleCreateAccessTokenDialogConfirm}
+      />
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => !open && setDeleteTarget(undefined)}
+        title={deleteTarget ? t("setting.access-token.access-token-deletion", { description: deleteTarget.description }) : ""}
+        description={t("setting.access-token.access-token-deletion-description")}
+        confirmLabel={t("common.delete")}
+        cancelLabel={t("common.cancel")}
+        onConfirm={confirmDeleteAccessToken}
+        confirmVariant="destructive"
+      />
+    </SettingGroup>
   );
 };
 

@@ -1,23 +1,31 @@
-import { Button, Checkbox, Input } from "@/components/ui/mui";
+import { timestampDate } from "@bufbuild/protobuf/wkt";
 import { LoaderIcon } from "lucide-react";
-import { observer } from "mobx-react-lite";
-import { ClientError } from "nice-grpc-web";
 import { useState } from "react";
 import { toast } from "react-hot-toast";
-import { authServiceClient } from "@/grpcweb";
+import { setAccessToken } from "@/auth-state";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { authServiceClient } from "@/connect";
+import { useAuth } from "@/contexts/AuthContext";
+import { useInstance } from "@/contexts/InstanceContext";
 import useLoading from "@/hooks/useLoading";
 import useNavigateTo from "@/hooks/useNavigateTo";
-import { workspaceStore } from "@/store/v2";
-import { initialUserStore } from "@/store/v2/user";
+import { handleError } from "@/lib/error";
+import { ROUTES } from "@/router/routes";
 import { useTranslate } from "@/utils/i18n";
 
-const PasswordSignInForm = observer(() => {
+interface PasswordSignInFormProps {
+  redirectPath?: string;
+}
+
+function PasswordSignInForm({ redirectPath }: PasswordSignInFormProps) {
   const t = useTranslate();
   const navigateTo = useNavigateTo();
+  const { profile } = useInstance();
+  const { initialize } = useAuth();
   const actionBtnLoadingState = useLoading(false);
-  const [username, setUsername] = useState(workspaceStore.state.profile.mode === "demo" ? "yourselfhosted" : "");
-  const [password, setPassword] = useState(workspaceStore.state.profile.mode === "demo" ? "yourselfhosted" : "");
-  const [remember, setRemember] = useState(true);
+  const [username, setUsername] = useState(profile.demo ? "demo" : "");
+  const [password, setPassword] = useState(profile.demo ? "secret" : "");
 
   const handleUsernameInputChanged = (e: React.ChangeEvent<HTMLInputElement>) => {
     const text = e.target.value as string;
@@ -45,12 +53,22 @@ const PasswordSignInForm = observer(() => {
 
     try {
       actionBtnLoadingState.setLoading();
-      await authServiceClient.signIn({ passwordCredentials: { username, password }, neverExpire: remember });
-      await initialUserStore();
-      navigateTo("/");
-    } catch (error: any) {
-      console.error(error);
-      toast.error((error as ClientError).details || "Failed to sign in.");
+      const response = await authServiceClient.signIn({
+        credentials: {
+          case: "passwordCredentials",
+          value: { username, password },
+        },
+      });
+      // Store access token from login response
+      if (response.accessToken) {
+        setAccessToken(response.accessToken, response.accessTokenExpiresAt ? timestampDate(response.accessTokenExpiresAt) : undefined);
+      }
+      await initialize();
+      navigateTo(redirectPath || ROUTES.HOME, { replace: true });
+    } catch (error: unknown) {
+      handleError(error, toast.error, {
+        fallbackMessage: "Failed to sign in.",
+      });
     }
     actionBtnLoadingState.setFinish();
   };
@@ -59,10 +77,9 @@ const PasswordSignInForm = observer(() => {
     <form className="w-full mt-2" onSubmit={handleFormSubmit}>
       <div className="flex flex-col justify-start items-start w-full gap-4">
         <div className="w-full flex flex-col justify-start items-start">
-          <span className="leading-8 text-gray-600">{t("common.username")}</span>
+          <span className="leading-8 text-muted-foreground">{t("common.username")}</span>
           <Input
-            className="w-full bg-white dark:bg-black"
-            size="lg"
+            className="w-full bg-background h-10"
             type="text"
             readOnly={actionBtnLoadingState.isLoading}
             placeholder={t("common.username")}
@@ -75,15 +92,14 @@ const PasswordSignInForm = observer(() => {
           />
         </div>
         <div className="w-full flex flex-col justify-start items-start">
-          <span className="leading-8 text-gray-600">{t("common.password")}</span>
+          <span className="leading-8 text-muted-foreground">{t("common.password")}</span>
           <Input
-            className="w-full bg-white dark:bg-black"
-            size="lg"
+            className="w-full bg-background h-10"
             type="password"
             readOnly={actionBtnLoadingState.isLoading}
             placeholder={t("common.password")}
             value={password}
-            autoComplete="password"
+            autoComplete="current-password"
             autoCapitalize="off"
             spellCheck={false}
             onChange={handlePasswordInputChanged}
@@ -91,24 +107,14 @@ const PasswordSignInForm = observer(() => {
           />
         </div>
       </div>
-      <div className="flex flex-row justify-start items-center w-full mt-6">
-        <Checkbox label={t("common.remember-me")} checked={remember} onChange={(e) => setRemember(e.target.checked)} />
-      </div>
       <div className="flex flex-row justify-end items-center w-full mt-6">
-        <Button
-          type="submit"
-          color="primary"
-          size="lg"
-          fullWidth
-          disabled={actionBtnLoadingState.isLoading}
-          onClick={handleSignInButtonClick}
-        >
+        <Button type="submit" className="w-full h-10" disabled={actionBtnLoadingState.isLoading} onClick={handleSignInButtonClick}>
           {t("common.sign-in")}
           {actionBtnLoadingState.isLoading && <LoaderIcon className="w-5 h-auto ml-2 animate-spin opacity-60" />}
         </Button>
       </div>
     </form>
   );
-});
+}
 
 export default PasswordSignInForm;

@@ -1,83 +1,118 @@
-import { Divider, Option, Select } from "@mui/joy";
-import { observer } from "mobx-react-lite";
-import { userStore } from "@/store/v2";
-import { Visibility } from "@/types/proto/api/v1/memo_service";
-import { UserSetting } from "@/types/proto/api/v1/user_service";
-import { useTranslate } from "@/utils/i18n";
+import { create } from "@bufbuild/protobuf";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useAuth } from "@/contexts/AuthContext";
+import { useUpdateUserGeneralSetting } from "@/hooks/useUserQueries";
+import { Visibility } from "@/types/proto/api/v1/memo_service_pb";
+import { UserSetting_GeneralSetting, UserSetting_GeneralSettingSchema } from "@/types/proto/api/v1/user_service_pb";
+import { loadLocale, useTranslate } from "@/utils/i18n";
 import { convertVisibilityFromString, convertVisibilityToString } from "@/utils/memo";
-import AppearanceSelect from "../AppearanceSelect";
+import { loadTheme } from "@/utils/theme";
 import LocaleSelect from "../LocaleSelect";
+import ThemeSelect from "../ThemeSelect";
 import VisibilityIcon from "../VisibilityIcon";
-import WebhookSection from "./WebhookSection";
+import SettingGroup from "./SettingGroup";
+import { SettingList, SettingListItem } from "./SettingList";
+import SettingSection from "./SettingSection";
 
-const PreferencesSection = observer(() => {
+const PreferencesSection = () => {
   const t = useTranslate();
-  const setting = userStore.state.userSetting as UserSetting;
+  const { currentUser, userGeneralSetting: generalSetting, refetchSettings } = useAuth();
+  const { mutate: updateUserGeneralSetting } = useUpdateUserGeneralSetting(currentUser?.name);
 
-  // 防御性检查，如果setting为undefined，提供默认值
-  if (!setting) {
-    return (
-      <div className="w-full flex flex-col gap-2 pt-2 pb-4">
-        <p className="font-medium text-gray-700 dark:text-gray-500">Loading user settings...</p>
-      </div>
+  const handleLocaleSelectChange = (locale: Locale) => {
+    // Apply locale immediately for instant UI feedback and persist to localStorage
+    loadLocale(locale);
+    // Persist to user settings
+    updateUserGeneralSetting(
+      { generalSetting: { locale }, updateMask: ["locale"] },
+      {
+        onSuccess: () => {
+          refetchSettings();
+        },
+      },
     );
-  }
-
-  const handleLocaleSelectChange = async (locale: Locale) => {
-    await userStore.updateUserSetting({ locale }, ["locale"]);
   };
 
-  const handleAppearanceSelectChange = async (appearance: Appearance) => {
-    await userStore.updateUserSetting({ appearance }, ["appearance"]);
+  const handleDefaultMemoVisibilityChanged = (value: string) => {
+    updateUserGeneralSetting(
+      { generalSetting: { memoVisibility: value }, updateMask: ["memo_visibility"] },
+      {
+        onSuccess: () => {
+          refetchSettings();
+        },
+      },
+    );
   };
 
-  const handleDefaultMemoVisibilityChanged = async (value: string) => {
-    await userStore.updateUserSetting({ memoVisibility: value }, ["memo_visibility"]);
+  const handleThemeChange = (theme: string) => {
+    // Apply theme immediately for instant UI feedback
+    loadTheme(theme);
+    // Persist to user settings
+    updateUserGeneralSetting(
+      { generalSetting: { theme }, updateMask: ["theme"] },
+      {
+        onSuccess: () => {
+          refetchSettings();
+        },
+      },
+    );
   };
+
+  // Provide default values if setting is not loaded yet
+  const setting: UserSetting_GeneralSetting =
+    generalSetting ||
+    create(UserSetting_GeneralSettingSchema, {
+      locale: "en",
+      memoVisibility: "PRIVATE",
+      theme: "system",
+    });
 
   return (
-    <div className="w-full flex flex-col gap-2 pt-2 pb-4">
-      <p className="font-medium text-gray-700 dark:text-gray-500">{t("common.basic")}</p>
+    <SettingSection title={t("setting.preference.label")}>
+      <SettingGroup title={t("setting.preference.appearance-title")} description={t("setting.preference.appearance-description")}>
+        <SettingList>
+          <SettingListItem label={t("common.language")} description={t("setting.preference.language-description")}>
+            <LocaleSelect value={setting.locale} onChange={handleLocaleSelectChange} />
+          </SettingListItem>
 
-      <div className="w-full flex flex-row justify-between items-center">
-        <span>{t("common.language")}</span>
-        <LocaleSelect value={setting.locale || 'zh'} onChange={handleLocaleSelectChange} />
-      </div>
+          <SettingListItem label={t("setting.preference.theme")} description={t("setting.preference.theme-description")}>
+            <ThemeSelect value={setting.theme} onValueChange={handleThemeChange} />
+          </SettingListItem>
+        </SettingList>
+      </SettingGroup>
 
-      <div className="w-full flex flex-row justify-between items-center">
-        <span>{t("setting.preference-section.theme")}</span>
-        <AppearanceSelect value={(setting.appearance || 'system') as Appearance} onChange={handleAppearanceSelectChange} />
-      </div>
-
-      <p className="font-medium text-gray-700 dark:text-gray-500">{t("setting.preference")}</p>
-
-      <div className="w-full flex flex-row justify-between items-center">
-        <span className="truncate">{t("setting.preference-section.default-memo-visibility")}</span>
-        <Select
-          className="min-w-fit!"
-          value={setting.memoVisibility || 'PRIVATE'}
-          startDecorator={<VisibilityIcon visibility={convertVisibilityFromString(setting.memoVisibility || 'PRIVATE')} />}
-          onChange={(_, visibility) => {
-            if (visibility) {
-              handleDefaultMemoVisibilityChanged(visibility);
-            }
-          }}
-        >
-          {[Visibility.PRIVATE, Visibility.PROTECTED, Visibility.PUBLIC]
-            .map((v) => convertVisibilityToString(v))
-            .map((item) => (
-              <Option key={item} value={item} className="whitespace-nowrap">
-                {t(`memo.visibility.${item.toLowerCase() as Lowercase<typeof item>}`)}
-              </Option>
-            ))}
-        </Select>
-      </div>
-
-      <Divider className="my-3!" />
-
-      <WebhookSection />
-    </div>
+      <SettingGroup
+        title={t("setting.preference.memo-defaults-title")}
+        description={t("setting.preference.memo-defaults-description")}
+        showSeparator
+      >
+        <SettingList>
+          <SettingListItem
+            label={t("setting.preference.default-memo-visibility")}
+            description={t("setting.preference.default-memo-visibility-description")}
+          >
+            <Select value={setting.memoVisibility || "PRIVATE"} onValueChange={handleDefaultMemoVisibilityChanged}>
+              <SelectTrigger className="min-w-fit">
+                <div className="flex items-center gap-2">
+                  <VisibilityIcon visibility={convertVisibilityFromString(setting.memoVisibility)} />
+                  <SelectValue />
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                {[Visibility.PRIVATE, Visibility.PROTECTED, Visibility.PUBLIC]
+                  .map((v) => convertVisibilityToString(v))
+                  .map((item) => (
+                    <SelectItem key={item} value={item} className="whitespace-nowrap">
+                      {t(`memo.visibility.${item.toLowerCase() as Lowercase<typeof item>}`)}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </SettingListItem>
+        </SettingList>
+      </SettingGroup>
+    </SettingSection>
   );
-});
+};
 
 export default PreferencesSection;

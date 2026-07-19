@@ -1,29 +1,53 @@
 {
+  "about": {
+    "blogs": "Blogi",
+    "description": "Usługa notatek z naciskiem na prywatność i lekkość. Łatwo zapisuj i udostępniaj swoje myśli.",
+    "documents": "Dokumenty",
+    "github-repository": "Repozytorium GitHub",
+    "official-website": "Oficjalna strona"
+  },
   "auth": {
     "create-your-account": "Utwórz swoje konto",
     "host-tip": "Rejestrujesz się jako Gospodarz Strony.",
     "new-password": "Nowe hasło",
+    "protected-memo-notice": "This memo is not public. Sign in to continue.",
     "repeat-new-password": "Powtórz nowe hasło",
     "sign-in-tip": "Masz już konto?",
     "sign-up-tip": "Nie masz jeszcze konta?"
   },
   "common": {
     "about": "O nas",
+    "add": "Dodaj",
     "admin": "Administrator",
+    "all": "Wszystkie",
     "archive": "Archiwum",
     "archived": "Zarchiwizowane",
+    "attachments": "Załączniki",
+    "auto-expand": "Rozwiń automatycznie",
     "avatar": "Awatar",
     "basic": "Podstawowy",
     "beta": "Beta",
+    "calendar": "Kalendarz",
     "cancel": "Anuluj",
     "change": "Zmień",
     "clear": "Wyczyść",
     "close": "Zamknij",
     "collapse": "Zwiń",
     "confirm": "Potwierdź",
+    "copy": "Kopiuj",
     "create": "Utwórz",
+    "created-at": "Utworzono",
     "database": "Baza danych",
-    "days": "Dni",
+    "day": "Dzień",
+    "days": {
+      "fri": "Pt",
+      "mon": "Pn",
+      "sat": "Sb",
+      "sun": "Nd",
+      "thu": "Czw",
+      "tue": "Wt",
+      "wed": "Śr"
+    },
     "delete": "Usuń",
     "description": "Opis",
     "edit": "Edytuj",
@@ -34,12 +58,18 @@
     "filter": "Filtr",
     "home": "Strona główna",
     "image": "Obraz",
+    "in": "W",
     "inbox": "Skrzynka odbiorcza",
+    "input": "Wejście",
     "language": "Język",
+    "last-updated-at": "Ostatnia aktualizacja",
     "learn-more": "Dowiedz się więcej",
     "link": "Link",
+    "map": "Mapa",
     "mark": "Oznacz",
+    "memo": "Notatka",
     "memos": "Notatki",
+    "more": "Więcej",
     "name": "Nazwa",
     "new": "Nowy",
     "nickname": "Pseudonim",
@@ -50,6 +80,10 @@
     "pinned": "Przypięte",
     "preview": "Podgląd",
     "profile": "Profil",
+    "properties": "Właściwości",
+    "referenced-by": "Wspomniane przez",
+    "referencing": "Odwołuje się do",
+    "relations": "Relacje",
     "remember-me": "Zapamiętaj mnie",
     "rename": "Zmień nazwę",
     "reset": "Resetuj",
@@ -61,6 +95,8 @@
     "select": "Wybierz",
     "settings": "Ustawienia",
     "share": "Udostępnij",
+    "shortcut-filter": "Filtr skrótów",
+    "shortcuts": "Skróty",
     "sign-in": "Zaloguj się",
     "sign-in-with": "Zaloguj się za pomocą {{provider}}",
     "sign-out": "Wyloguj się",
@@ -68,48 +104,100 @@
     "statistics": "Statystyki",
     "tags": "Tagi",
     "title": "Tytuł",
+    "today": "Dziś",
+    "tree-mode": "Tryb drzewa",
     "type": "Typ",
     "unpin": "Odepnij",
     "update": "Aktualizuj",
     "upload": "Prześlij",
+    "user": "Użytkownik",
     "username": "Nazwa użytkownika",
     "version": "Wersja",
     "visibility": "Widoczność",
     "yourself": "Ty sam"
   },
-  "days": {
-    "fri": "Pt",
-    "mon": "Pn",
-    "sat": "Sb",
-    "sun": "Nd",
-    "thu": "Czw",
-    "tue": "Wt",
-    "wed": "Śr"
-  },
   "editor": {
     "add-your-comment-here": "Dodaj swój komentarz tutaj...",
     "any-thoughts": "Jakieś przemyślenia...",
-    "save": "Zapisz"
+    "exit-focus-mode": "Wyjdź z Trybu Skupienia",
+    "focus-mode": "Tryb Skupienia",
+    "no-changes-detected": "Brak wykrytych zmian",
+    "save": "Zapisz",
+    "saving": "Zapisywanie...",
+    "slash-commands": "Wciśnij `/` aby wydawać komendy",
+    "insert-menu": {
+      "add-location": "Dodaj lokalizację",
+      "link-memo": "Link do notatki",
+      "upload-file": "Prześlij plik"
+    },
+    "audio-recorder": {
+      "attachment-label": "Nagrywanie dźwięku",
+      "attachment-label-with-time": "Nagranie dźwięku {{time}}",
+      "discard": "Odrzuć",
+      "error": "Mikrofon niedostępny",
+      "error-description": "Spróbuj ponownie po sprawdzeniu dostępu do mikrofonu dla tej witryny.",
+      "idle-description": "Rozpocznij nagrywanie, aby dodać nagranie dźwiękowe jako załącznik.",
+      "keep": "Nagrywaj dalej",
+      "pause-recording": "Wstrzymaj nagrywanie dźwięku",
+      "play-recording": "Odtwórz nagranie audio",
+      "ready": "Nagrywanie gotowe",
+      "ready-description": "Wyświetl podgląd klipu, a następnie zachowaj go jako załącznik audio lub odrzuć.",
+      "record-again": "Nagraj ponownie",
+      "recording": "Nagrywanie dźwięku",
+      "recording-description": "Nagraj szybki załącznik audio. Aktualna długość: {{duration}}",
+      "requesting": "Prośba o dostęp...",
+      "requesting-permission": "Prośba o dostęp do mikrofonu",
+      "requesting-permission-description": "Zezwól na dostęp do mikrofonu w przeglądarce, aby rozpocząć nagrywanie.",
+      "start": "Rozpocznij nagrywanie",
+      "stop": "Zatrzymaj nagrywanie",
+      "title": "Rejestrator dźwięku",
+      "trigger": "Nagraj dźwięk",
+      "unsupported": "Nagrywanie dźwięku nie jest obsługiwane",
+      "unsupported-description": "Ta przeglądarka nie może nagrywać dźwięku z narzędzia do tworzenia notatek."
+    }
   },
   "inbox": {
+    "failed-to-load": "Nie udało się załadować elementu skrzynki odbiorczej",
     "memo-comment": "{{user}} dodał komentarz do Twojego {{memo}}.",
+    "no-archived": "Brak zarchiwizowanych powiadomień",
+    "no-unread": "Brak nieprzeczytanych powiadomień",
+    "unread": "Nieprzeczytane",
     "version-update": "Nowa wersja {{version}} jest już dostępna!"
+  },
+  "markdown": {
+    "checkbox": "Pole wyboru",
+    "code-block": "Blok kodu",
+    "content-syntax": "Składnia treści"
   },
   "memo": {
     "archived-at": "Zarchiwizowano w dniu",
+    "click-to-hide-sensitive-content": "Kliknij, aby ukryć treści NSFW",
+    "click-to-show-sensitive-content": "Kliknij, aby pokazać treści NSFW",
     "code": "Kod",
     "comment": {
       "self": "Komentarze",
       "write-a-comment": "Napisz komentarz"
     },
+    "copy-content": "Kopiuj treść",
     "copy-link": "Kopiuj link",
-    "count-memos-in-date": "{{count}} notatek w dniu {{date}}",
-    "delete-confirm": "Czy na pewno chcesz usunąć tę notatkę? TA AKCJA JEST NIEODWRACALNA",
+    "count-memos-in-date": "{{count}} {{memos}} w dniu {{date}}",
+    "delete-confirm": "Czy na pewno chcesz usunąć tę notatkę?",
+    "delete-confirm-description": "Czy na pewno chcesz usunąć tę notatkę? Załączniki, linki i odnośniki także będą usunięte. TA AKCJA JEST NIEODWRACALNA",
+    "direction": "Kierunek",
+    "direction-asc": "Rosnąco",
+    "direction-desc": "Malejąco",
+    "display-time": "Wyświetl czas",
+    "filters": {
+      "has-code": "ma kod",
+      "has-link": "ma link",
+      "has-task-list": "ma listę zadań",
+      "label": "Filtry"
+    },
     "links": "Linki",
     "load-more": "Załaduj więcej",
     "no-archived-memos": "Brak zarchiwizowanych notatek.",
-    "remove-completed-task-list-items": "Usuń zakończone",
-    "remove-completed-task-list-items-confirm": "Czy jesteś pewny, że chcesz usunąć wszystkie zakończone zadania? (Ta akcja jest nieodwracalna)",
+    "no-memos": "Brak notatek.",
+    "order-by": "Sortuj według",
     "search-placeholder": "Szukaj notatek",
     "show-less": "Pokaż mniej",
     "show-more": "Pokaż więcej",
@@ -120,22 +208,51 @@
       "private": "Prywatne",
       "protected": "Przestrzeń robocza",
       "public": "Publiczne"
+    },
+    "outline": "Zarys",
+    "share": {
+      "active-links": "Aktywne linki udostępniania",
+      "copied": "Skopiowano!",
+      "copy": "Skopiuj link",
+      "create-failed": "Nie udało się utworzyć linku do udostępniania",
+      "create-link": "Utwórz nowe łącze",
+      "creating": "Tworzenie…",
+      "expiry-1-day": "1 dzień",
+      "expiry-30-days": "30 dni",
+      "expiry-7-days": "7 dni",
+      "expiry-label": "Wygasa",
+      "expiry-never": "Nigdy",
+      "expires-on": "Wygasa {{date}}",
+      "invalid-link": "Ten link jest nieprawidłowy lub wygasł.",
+      "never-expires": "Nigdy nie wygasa",
+      "no-links": "Nie ma jeszcze żadnych linków do udostępniania. Utwórz jeden poniżej.",
+      "open-panel": "Zarządzaj udostępnianymi linkami",
+      "revoke": "Odwołaj",
+      "revoke-failed": "Nie udało się unieważnić linku",
+      "revoked": "Link do udostępniania został odwołany",
+      "section-label": "Udostępnianie",
+      "share": "Udostępnij",
+      "shared-by": "Udostępnione przez {{creator}}",
+      "title": "Udostępnij tę notatkę"
     }
   },
   "message": {
     "archived-successfully": "Zarchiwizowano pomyślnie",
-    "change-memo-created-time": "Zmień date utworzenia notatki",
+    "change-memo-created-time": "Zmień datę utworzenia notatki",
     "copied": "Skopiowano",
     "deleted-successfully": "Usunięto pomyślnie",
+    "description-is-required": "Opis jest wymagany",
+    "failed-to-embed-memo": "Nie udało się osadzić notatki",
     "fill-all": "Proszę wypełnić wszystkie pola.",
+    "fill-all-required-fields": "Proszę wypełnić wszystkie wymagane pola",
     "maximum-upload-size-is": "Maksymalny dozwolony rozmiar przesyłanego pliku to {{size}} MiB",
     "memo-not-found": "Notatka nie została znaleziona.",
     "new-password-not-match": "Nowe hasła nie pasują do siebie.",
     "no-data": "Nie znaleziono danych.",
     "password-changed": "Hasło zostało zmienione",
     "password-not-match": "Hasła nie pasują do siebie.",
-    "remove-completed-task-list-items-successfully": "Pomyślnie usunięto!",
     "restored-successfully": "Przywrócono pomyślnie",
+    "succeed-copy-content": "Treść została pomyślnie skopiowana.",
     "succeed-copy-link": "Link skopiowany pomyślnie.",
     "update-succeed": "Aktualizacja zakończona sukcesem",
     "user-not-found": "Użytkownik nie został znaleziony"
@@ -166,6 +283,10 @@
       "title": "Utwórz Zasób",
       "upload-method": "Metoda przesyłania"
     },
+    "delete-all-unused": "Usuń wszystkie nieużywane",
+    "delete-all-unused-confirm": "Na pewno chcesz usunąć wszystkie nieużywane zasoby?? TA AKCJA JEST NIEODWRACALNA",
+    "delete-all-unused-error": "Nie udało się usunąć nieużywanych zasobów",
+    "delete-all-unused-success": "Zasoby zostały pomyślnie usunięte",
     "delete-resource": "Usuń zasób",
     "delete-selected-resources": "Usuń wybrane zasoby",
     "fetching-data": "Pobieranie danych…",
@@ -176,50 +297,45 @@
     "no-unused-resources": "Brak nieużywanych zasobów",
     "reset-link": "Resetuj link",
     "reset-link-prompt": "Czy na pewno chcesz zresetować link? Spowoduje to zerwanie wszystkich obecnych powiązań linku. TA AKCJA JEST NIEODWRACALNA",
-    "reset-resource-link": "Resetuj link zasobu"
+    "reset-resource-link": "Resetuj link zasobu",
+    "unused-resources": "Nieużywane zasoby"
   },
   "router": {
     "back-to-top": "Powrót na górę",
     "go-to-home": "Przejdź do strony głównej"
   },
   "setting": {
-    "account-section": {
-      "change-password": "Zmień hasło",
-      "email-note": "Opcjonalne",
-      "export-memos": "Eksportuj notatki",
-      "nickname-note": "Wyświetlane w banerze",
-      "openapi-reset": "Resetuj klucz OpenAPI",
-      "openapi-sample-post": "Witaj #memos z {{url}}",
-      "openapi-title": "OpenAPI",
-      "reset-api": "Resetuj API",
-      "title": "Informacje o koncie",
-      "update-information": "Zaktualizuj informacje",
-      "username-note": "Używane do logowania"
-    },
-    "appearance-option": {
-      "dark": "Zawsze ciemny",
-      "light": "Zawsze jasny",
-      "system": "Zgodnie z systemem"
-    },
-    "member": "Członek",
-    "member-list": "Lista członków",
-    "member-section": {
+    "member": {
+      "admin": "Administrator",
       "archive-member": "Archiwizuj członka",
+      "archive-success": "{{username}} pomyślnie zarchiwizowany",
       "archive-warning": "Czy na pewno chcesz zarchiwizować {{username}}?",
+      "archive-warning-description": "Archiwizacja zablokuje to konto. Możesz je odblokować lub usunąć później.",
       "create-a-member": "Utwórz członka",
       "delete-member": "Usuń członka",
-      "delete-warning": "Czy na pewno chcesz usunąć {{username}}? TA AKCJA JEST NIEODWRACALNA"
+      "delete-success": "{{username}} pomyślnie usunięty",
+      "delete-warning": "Czy na pewno chcesz usunąć {{username}}?",
+      "delete-warning-description": "TA AKCJA JEST NIEODWRACALNA",
+      "restore-success": "{{username}} pomyślnie odtworzony",
+      "user": "Użytkownik",
+      "label": "Członek",
+      "list-title": "Lista członków",
+      "no-members-found": "Nie znaleziono żadnych członków"
     },
-    "memo-related": "Notatki",
-    "my-account": "Moje konto",
-    "preference": "Preferencje",
-    "preference-section": {
+    "my-account": {
+      "label": "Moje konto"
+    },
+    "preference": {
       "default-memo-sort-option": "Domyślny czas wyświetlania notatek",
       "default-memo-visibility": "Domyślna widoczność notatek",
-      "theme": "Motyw"
+      "theme": "Motyw",
+      "label": "Preferencje"
     },
-    "sso": "SSO",
-    "sso-section": {
+    "shortcut": {
+      "delete-confirm": "Czy na pewno chcesz usunąć skrót `{{title}}`?",
+      "delete-success": "Skrót `{{title}}` usunięty pomyślnie"
+    },
+    "sso": {
       "authorization-endpoint": "Punkt autoryzacji",
       "client-id": "ID klienta",
       "client-secret": "Tajny klucz klienta",
@@ -231,18 +347,20 @@
       "display-name": "Nazwa wyświetlana",
       "identifier": "Identyfikator",
       "identifier-filter": "Filtr identyfikatorów",
+      "no-sso-found": "Nie znaleziono SSO.",
       "redirect-url": "URL przekierowania",
       "scopes": "Zakresy",
+      "single-sign-on": "Konfiguracja Single Sign-On (SSO) do uwierzytelniania",
       "sso-created": "SSO {{name}} utworzono",
       "sso-list": "Lista SSO",
       "sso-updated": "SSO {{name}} zaktualizowano",
       "template": "Szablon",
       "token-endpoint": "Punkt wydawania tokenów",
       "update-sso": "Zaktualizuj SSO",
-      "user-endpoint": "Punkt użytkownika"
+      "user-endpoint": "Punkt użytkownika",
+      "label": "SSO"
     },
-    "storage": "Przechowywanie",
-    "storage-section": {
+    "storage": {
       "accesskey": "Klucz dostępu",
       "accesskey-placeholder": "Klucz dostępu / ID dostępu",
       "bucket": "Bucket",
@@ -252,6 +370,7 @@
       "current-storage": "Aktualny magazyn obiektów",
       "delete-storage": "Usuń magazyn",
       "endpoint": "Punkt końcowy",
+      "filepath-template": "Szablon ścieżki pliku",
       "local-storage-path": "Ścieżka lokalnego magazynu",
       "path": "Ścieżka przechowywania",
       "path-description": "Możesz użyć tych samych dynamicznych zmiennych jak w lokalnym magazynie, takich jak {filename}",
@@ -273,17 +392,16 @@
       "url-prefix-placeholder": "Niestandardowy prefiks URL, opcjonalnie",
       "url-suffix": "Sufiks URL",
       "url-suffix-placeholder": "Niestandardowy sufiks URL, opcjonalnie",
-      "warning-text": "Czy na pewno chcesz usunąć usługę przechowywania \"{{name}}\"? TA AKCJA JEST NIEODWRACALNA"
+      "warning-text": "Czy na pewno chcesz usunąć usługę przechowywania \"{{name}}\"? TA AKCJA JEST NIEODWRACALNA",
+      "label": "Przechowywanie"
     },
-    "system": "System",
-    "system-section": {
+    "system": {
       "additional-script": "Dodatkowy skrypt",
       "additional-script-placeholder": "Dodatkowy kod JavaScript",
       "additional-style": "Dodatkowy styl",
       "additional-style-placeholder": "Dodatkowy kod CSS",
       "allow-user-signup": "Zezwól na rejestrację użytkowników",
       "customize-server": {
-        "appearance": "Wygląd serwera",
         "description": "Opis",
         "icon-url": "URL ikony",
         "locale": "Język serwera",
@@ -292,7 +410,6 @@
       "disable-password-login": "Wyłącz logowanie hasłem",
       "disable-password-login-final-warning": "Proszę wpisać \"CONFIRM\", jeśli wiesz, co robisz.",
       "disable-password-login-warning": "To wyłączy logowanie hasłem dla wszystkich użytkowników. Jeśli skonfigurowani dostawcy tożsamości zawiodą, nie będzie możliwe zalogowanie się bez przywrócenia tego ustawienia w bazie danych. Bądź także szczególnie ostrożny przy usuwaniu dostawcy tożsamości",
-      "disable-public-memos": "Wyłącz publiczne notatki",
       "display-with-updated-time": "Wyświetlaj z czasem aktualizacji",
       "enable-auto-compact": "Włącz automatyczne kompresowanie",
       "enable-double-click-to-edit": "Włącz edycję przez podwójne kliknięcie",
@@ -300,8 +417,100 @@
       "enable-password-login-warning": "To włączy logowanie hasłem dla wszystkich użytkowników. Kontynuuj tylko wtedy, gdy chcesz, aby użytkownicy mogli logować się za pomocą zarówno SSO, jak i hasła",
       "max-upload-size": "Maksymalny rozmiar przesyłanego pliku (MiB)",
       "max-upload-size-hint": "Zalecana wartość to 32 MiB.",
-      "removed-completed-task-list-items": "Włącz usuwanie zakończonych",
-      "server-name": "Nazwa serwera"
+      "removed-completed-task-list-items": "Włącz usuwanie zakończonych zadań",
+      "server-name": "Nazwa serwera",
+      "title": "Ogólne",
+      "label": "System"
+    },
+    "version": "Wersja",
+    "access-token": {
+      "access-token-copied-to-clipboard": "Token dostępu skopiowany do schowka",
+      "access-token-deleted": "Token dostępu `{{description}}` został usunięty",
+      "access-token-deletion": "Czy na pewno chcesz usunąć token dostępu `{{description}}`?",
+      "access-token-deletion-description": "TA AKCJA JEST NIEODWRACALNA. Będziesz musiał zaktualizować wszystkie serwisy korzystające z tego tokena aby używały nowego tokena.",
+      "create-dialog": {
+        "access-token-created": "Utworzono token dostępu `{{description}}`",
+        "create-access-token": "Utwórz token dostępu",
+        "created-at": "Utworzono",
+        "description": "Opis",
+        "duration-1m": "1 miesiąc",
+        "duration-8h": "8 godzin",
+        "duration-never": "Nigdy",
+        "expiration": "Wygaśnięcie",
+        "expires-at": "Wygasa",
+        "some-description": "Jakiś opis..."
+      },
+      "description": "Lista wszystkich tokenów dostępu do Twojego konta.",
+      "title": "Tokeny dostępu",
+      "token": "Token",
+      "no-tokens-found": "Nie znaleziono tokenów dostępu"
+    },
+    "account": {
+      "change-password": "Zmień hasło",
+      "email-note": "Opcjonalne",
+      "export-memos": "Eksportuj notatki",
+      "nickname-note": "Wyświetlane w banerze",
+      "openapi-reset": "Resetuj klucz OpenAPI",
+      "openapi-sample-post": "Witaj #memos z {{url}}",
+      "openapi-title": "OpenAPI",
+      "reset-api": "Resetuj API",
+      "title": "Informacje o koncie",
+      "update-information": "Zaktualizuj informacje",
+      "username-note": "Używane do logowania"
+    },
+    "instance": {
+      "disallow-change-nickname": "Zabroń zmiany pseudonimu",
+      "disallow-change-username": "Zabroń zmiany nazwy użytkownika",
+      "disallow-password-auth": "Zabroń uwierzytelniania hasłem",
+      "disallow-user-registration": "Zabroń rejestracji użytkowników",
+      "monday": "Poniedziałek",
+      "saturday": "Sobota",
+      "sunday": "Niedziela",
+      "week-start-day": "Dzień rozpoczęcia tygodnia"
+    },
+    "memo": {
+      "content-length-limit": "Limit długości treści (Bajty)",
+      "enable-blur-sensitive-content": "Włącz rozmycie treści NSFW",
+      "enable-memo-comments": "Włącz komentarze do notatek",
+      "enable-memo-location": "Włącz lokalizację notatek",
+      "reactions": "Reakcje",
+      "title": "Ustawienia notatek",
+      "label": "Notatki",
+      "reactions-required": "Lista reakcji nie może być pusta"
+    },
+    "webhook": {
+      "create-dialog": {
+        "an-easy-to-remember-name": "Łatwa do zapamiętania nazwa",
+        "create-webhook": "Utwórz webhook",
+        "create-webhook-success": "Webhook `{{name}}` utworzony",
+        "edit-webhook": "Edytuj webhook",
+        "payload-url": "URL payload",
+        "title": "Tytuł",
+        "url-example-post-receive": "https://przyklad.com/postreceive"
+      },
+      "delete-dialog": {
+        "delete-webhook-description": "Ta akcja jest nieodwracalna",
+        "delete-webhook-success": "Webhook `{{name}}` pomyślnie usunięty",
+        "delete-webhook-title": "Czy na pewno chcesz usunąć webhook `{{name}}`?"
+      },
+      "no-webhooks-found": "Nie znaleziono webhooków.",
+      "title": "Webhooki",
+      "url": "URL",
+      "label": "Webhooki"
+    },
+    "tags": {
+      "label": "Tagi",
+      "title": "Metadane tagu",
+      "description": "Przypisz opcjonalne kolory wyświetlania do tagów w całej instancji lub zamazaj dopasowaną treść notatki. Nazwy znaczników są traktowane jako zakotwiczone wzorce wyrażeń regularnych.",
+      "background-color": "Kolor tła",
+      "blur-content": "Zamazanie treści",
+      "no-tags-configured": "Nie skonfigurowano metadanych tagu.",
+      "tag-name": "Nazwa znacznika",
+      "tag-name-placeholder": "np. work lub project/.*",
+      "tag-already-exists": "Znacznik już istnieje.",
+      "tag-pattern-hint": "Nazwa tagu lub wzór wyrażenia regularnego (np. project/.* pasuje do wszystkich tagów project/)",
+      "invalid-regex": "Nieprawidłowy lub niebezpieczny wzorzec wyrażenia regularnego.",
+      "using-default-color": "Używanie domyślnego koloru."
     }
   },
   "tag": {
@@ -309,7 +518,28 @@
     "create-tag": "Utwórz tag",
     "create-tags-guide": "Możesz tworzyć tagi, wpisując `#tag`.",
     "delete-confirm": "Czy na pewno chcesz usunąć ten tag? Wszystkie powiązane notatki zostaną zarchiwizowane.",
+    "delete-success": "Tag został pomyślnie usunięty",
     "delete-tag": "Usuń tag",
-    "no-tag-found": "Nie znaleziono tagu"
+    "new-name": "Nowa nazwa",
+    "no-tag-found": "Nie znaleziono tagu",
+    "old-name": "Stara nazwa",
+    "rename-error-empty": "Nazwa tagu nie może być pusta ani zawierać spacji",
+    "rename-error-repeat": "Nowa nazwa nie może być taka sama jak stara nazwa",
+    "rename-success": "Tag został pomyślnie zmieniony",
+    "rename-tag": "Zmień nazwę tagu",
+    "rename-tip": "Wszystkie Twoje notatki z tym tagiem zostaną zaktualizowane."
+  },
+  "tooltip": {
+    "link-memo": "Podlinkuj Notatkę",
+    "markdown-menu": "Markdown",
+    "select-location": "Lokalizacja",
+    "select-visibility": "Widoczność",
+    "tags": "Tagi",
+    "upload-attachment": "Prześlij Załącznik(i)"
+  },
+  "live-update": {
+    "connected": "Aktywne aktualizacje na żywo",
+    "connecting": "Łączę się z aktualizacjami na żywo...",
+    "disconnected": "Aktualizacje na żywo niedostępne"
   }
 }

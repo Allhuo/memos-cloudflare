@@ -1,28 +1,28 @@
-import react from "@vitejs/plugin-react";
-import { codeInspectorPlugin } from "code-inspector-plugin";
+import babel from "@rolldown/plugin-babel";
+import react, { reactCompilerPreset } from "@vitejs/plugin-react";
 import { resolve } from "path";
 import { defineConfig } from "vite";
 import tailwindcss from "@tailwindcss/vite";
 
-let devProxyServer = "http://localhost:8787";
+let devProxyServer = "http://localhost:8081";
 if (process.env.DEV_PROXY_SERVER && process.env.DEV_PROXY_SERVER.length > 0) {
   console.log("Use devProxyServer from environment: ", process.env.DEV_PROXY_SERVER);
   devProxyServer = process.env.DEV_PROXY_SERVER;
 }
 
-// https://vitejs.dev/config/
+// https://vite.dev/config/
 export default defineConfig({
-  plugins: [
-    react(),
-    tailwindcss(),
-    codeInspectorPlugin({
-      bundler: "vite",
-    }),
-  ],
+  plugins: [react(), babel({ presets: [reactCompilerPreset()] }), tailwindcss()],
   server: {
     host: "0.0.0.0",
     port: 3001,
     proxy: {
+      "^/api/v1/sse": {
+        target: devProxyServer,
+        xfwd: true,
+        // SSE requires no response buffering and longer timeout.
+        timeout: 0,
+      },
       "^/api": {
         target: devProxyServer,
         xfwd: true,
@@ -43,14 +43,19 @@ export default defineConfig({
     },
   },
   build: {
-    rollupOptions: {
+    rolldownOptions: {
       output: {
-        manualChunks: {
-          "mui-vendor": ["@mui/joy", "@emotion/react", "@emotion/styled"],
-          "utils-vendor": ["dayjs", "lodash-es"],
-          "katex-vendor": ["katex"],
-          "mermaid-vendor": ["mermaid"],
-          "leaflet-vendor": ["leaflet", "react-leaflet"],
+        codeSplitting: {
+          groups: [
+            {
+              name: "utils-vendor",
+              test: /node_modules[\\/](dayjs|lodash-es)([\\/]|$)/,
+            },
+            {
+              name: "leaflet-vendor",
+              test: /node_modules[\\/]leaflet([\\/]|$)/,
+            },
+          ],
         },
       },
     },

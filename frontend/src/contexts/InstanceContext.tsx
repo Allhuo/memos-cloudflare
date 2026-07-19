@@ -1,0 +1,239 @@
+import { create } from "@bufbuild/protobuf";
+import { createContext, type ReactNode, useCallback, useContext, useMemo, useRef, useState } from "react";
+import { instanceServiceClient } from "@/connect";
+import {
+  InstanceProfile,
+  InstanceProfileSchema,
+  InstanceSetting,
+  InstanceSetting_AISetting,
+  InstanceSetting_AISettingSchema,
+  InstanceSetting_GeneralSetting,
+  InstanceSetting_GeneralSettingSchema,
+  InstanceSetting_Key,
+  InstanceSetting_MemoRelatedSetting,
+  InstanceSetting_MemoRelatedSettingSchema,
+  InstanceSetting_NotificationSetting,
+  InstanceSetting_NotificationSettingSchema,
+  InstanceSetting_StorageSetting,
+  InstanceSetting_StorageSettingSchema,
+  InstanceSetting_TagsSetting,
+  InstanceSetting_TagsSettingSchema,
+} from "@/types/proto/api/v1/instance_service_pb";
+
+const instanceSettingNamePrefix = "instance/settings/";
+
+const buildInstanceSettingName = (key: InstanceSetting_Key): string => {
+  const keyName = InstanceSetting_Key[key];
+  return `${instanceSettingNamePrefix}${keyName}`;
+};
+
+interface InstanceState {
+  profile: InstanceProfile;
+  settings: InstanceSetting[];
+  isInitialized: boolean;
+  isLoading: boolean;
+  // True only when the profile was successfully fetched from the server.
+  // Remains false if initialization failed, so consumers can distinguish
+  // "no admin exists" from "failed to load profile".
+  profileLoaded: boolean;
+}
+
+interface InstanceContextValue extends InstanceState {
+  generalSetting: InstanceSetting_GeneralSetting;
+  memoRelatedSetting: InstanceSetting_MemoRelatedSetting;
+  storageSetting: InstanceSetting_StorageSetting;
+  tagsSetting: InstanceSetting_TagsSetting;
+  notificationSetting: InstanceSetting_NotificationSetting;
+  aiSetting: InstanceSetting_AISetting;
+  initialize: () => Promise<void>;
+  fetchSetting: (key: InstanceSetting_Key) => Promise<void>;
+  fetchSettings: (keys: InstanceSetting_Key[]) => Promise<void>;
+  updateSetting: (setting: InstanceSetting) => Promise<void>;
+}
+
+const InstanceContext = createContext<InstanceContextValue | null>(null);
+
+export function InstanceProvider({ children }: { children: ReactNode }) {
+  const [state, setState] = useState<InstanceState>({
+    profile: create(InstanceProfileSchema, {}),
+    settings: [],
+    isInitialized: false,
+    isLoading: true,
+    profileLoaded: false,
+  });
+
+  const fetchedSettingsRef = useRef<Set<string>>(new Set());
+
+  // Memoize derived settings to prevent unnecessary recalculations
+  const generalSetting = useMemo((): InstanceSetting_GeneralSetting => {
+    const setting = state.settings.find((s) => s.name === `${instanceSettingNamePrefix}GENERAL`);
+    if (setting?.value.case === "generalSetting") {
+      return setting.value.value;
+    }
+    return create(InstanceSetting_GeneralSettingSchema, {});
+  }, [state.settings]);
+
+  const memoRelatedSetting = useMemo((): InstanceSetting_MemoRelatedSetting => {
+    const setting = state.settings.find((s) => s.name === `${instanceSettingNamePrefix}MEMO_RELATED`);
+    if (setting?.value.case === "memoRelatedSetting") {
+      return setting.value.value;
+    }
+    return create(InstanceSetting_MemoRelatedSettingSchema, {});
+  }, [state.settings]);
+
+  const storageSetting = useMemo((): InstanceSetting_StorageSetting => {
+    const setting = state.settings.find((s) => s.name === `${instanceSettingNamePrefix}STORAGE`);
+    if (setting?.value.case === "storageSetting") {
+      return setting.value.value;
+    }
+    return create(InstanceSetting_StorageSettingSchema, {});
+  }, [state.settings]);
+
+  const tagsSetting = useMemo((): InstanceSetting_TagsSetting => {
+    const setting = state.settings.find((s) => s.name === `${instanceSettingNamePrefix}TAGS`);
+    if (setting?.value.case === "tagsSetting") {
+      return setting.value.value;
+    }
+    return create(InstanceSetting_TagsSettingSchema, {});
+  }, [state.settings]);
+
+  const notificationSetting = useMemo((): InstanceSetting_NotificationSetting => {
+    const setting = state.settings.find((s) => s.name === `${instanceSettingNamePrefix}NOTIFICATION`);
+    if (setting?.value.case === "notificationSetting") {
+      return setting.value.value;
+    }
+    return create(InstanceSetting_NotificationSettingSchema, {});
+  }, [state.settings]);
+
+  const aiSetting = useMemo((): InstanceSetting_AISetting => {
+    const setting = state.settings.find((s) => s.name === `${instanceSettingNamePrefix}AI`);
+    if (setting?.value.case === "aiSetting") {
+      return setting.value.value;
+    }
+    return create(InstanceSetting_AISettingSchema, {});
+  }, [state.settings]);
+
+  const initialize = useCallback(async () => {
+    setState((prev) => ({ ...prev, isLoading: true }));
+    try {
+      const profile = await instanceServiceClient.getInstanceProfile({});
+
+      const settingsResponse = await instanceServiceClient.batchGetInstanceSettings({
+        names: [
+          buildInstanceSettingName(InstanceSetting_Key.GENERAL),
+          buildInstanceSettingName(InstanceSetting_Key.MEMO_RELATED),
+          buildInstanceSettingName(InstanceSetting_Key.TAGS),
+        ],
+      });
+      for (const setting of settingsResponse.settings) {
+        fetchedSettingsRef.current.add(setting.name);
+      }
+
+      setState({
+        profile,
+        settings: settingsResponse.settings,
+        isInitialized: true,
+        isLoading: false,
+        profileLoaded: true,
+      });
+    } catch (error) {
+      console.error("Failed to initialize instance:", error);
+      setState((prev) => ({
+        ...prev,
+        isInitialized: true,
+        isLoading: false,
+      }));
+    }
+  }, []);
+
+  const fetchSettings = useCallback(async (keys: InstanceSetting_Key[]) => {
+    const names = keys.map(buildInstanceSettingName).filter((name) => !fetchedSettingsRef.current.has(name));
+    if (names.length === 0) {
+      return;
+    }
+
+    for (const name of names) {
+      fetchedSettingsRef.current.add(name);
+    }
+
+    try {
+      const response = await instanceServiceClient.batchGetInstanceSettings({ names });
+      const fetchedNames = new Set(response.settings.map((setting) => setting.name));
+      setState((prev) => ({
+        ...prev,
+        settings: [...prev.settings.filter((setting) => !fetchedNames.has(setting.name)), ...response.settings],
+      }));
+    } catch (error) {
+      for (const name of names) {
+        fetchedSettingsRef.current.delete(name);
+      }
+      throw error;
+    }
+  }, []);
+
+  const fetchSetting = useCallback(async (key: InstanceSetting_Key) => {
+    const name = buildInstanceSettingName(key);
+    if (fetchedSettingsRef.current.has(name)) {
+      return;
+    }
+    fetchedSettingsRef.current.add(name);
+    try {
+      const setting = await instanceServiceClient.getInstanceSetting({ name });
+      setState((prev) => ({
+        ...prev,
+        settings: [...prev.settings.filter((s) => s.name !== setting.name), setting],
+      }));
+    } catch (error) {
+      fetchedSettingsRef.current.delete(name);
+      throw error;
+    }
+  }, []);
+
+  const updateSetting = useCallback(async (setting: InstanceSetting) => {
+    const updatedSetting = await instanceServiceClient.updateInstanceSetting({ setting });
+    setState((prev) => ({
+      ...prev,
+      settings: [...prev.settings.filter((s) => s.name !== updatedSetting.name), updatedSetting],
+    }));
+  }, []);
+
+  // Memoize context value to prevent unnecessary re-renders of consumers
+  const value = useMemo(
+    () => ({
+      ...state,
+      generalSetting,
+      memoRelatedSetting,
+      storageSetting,
+      tagsSetting,
+      notificationSetting,
+      aiSetting,
+      initialize,
+      fetchSetting,
+      fetchSettings,
+      updateSetting,
+    }),
+    [
+      state,
+      generalSetting,
+      memoRelatedSetting,
+      storageSetting,
+      tagsSetting,
+      notificationSetting,
+      aiSetting,
+      initialize,
+      fetchSetting,
+      fetchSettings,
+      updateSetting,
+    ],
+  );
+
+  return <InstanceContext.Provider value={value}>{children}</InstanceContext.Provider>;
+}
+
+export function useInstance() {
+  const context = useContext(InstanceContext);
+  if (!context) {
+    throw new Error("useInstance must be used within InstanceProvider");
+  }
+  return context;
+}
