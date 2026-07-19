@@ -140,8 +140,13 @@ app.get('/o/r/:uid/:filename', async (c) => {
   }
 });
 
-// 404 处理
-app.notFound((c) => {
+// 404 处理：单 Worker 同源部署时回退到静态前端（SPA 路由如 /explore 返回 index.html）
+app.notFound(async (c) => {
+  if (c.env.ASSETS && c.req.method === 'GET') {
+    const res = await c.env.ASSETS.fetch(c.req.raw);
+    if (res.status !== 404) return res;
+    return c.env.ASSETS.fetch(new URL('/', c.req.url).toString());
+  }
   return c.json({ message: 'Not Found' }, 404);
 });
 

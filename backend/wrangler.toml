@@ -6,7 +6,8 @@ compatibility_flags = ["nodejs_compat"]
 
 [vars]
 LOG_LEVEL = "info"
-BASE_URL = "https://your-worker-name.your-subdomain.workers.dev"
+# 留空则 instanceUrl 回退为请求 origin（单 Worker 同源部署推荐留空）
+BASE_URL = ""
 
 # Secrets - set via wrangler secret put
 # JWT_SECRET
@@ -14,10 +15,15 @@ BASE_URL = "https://your-worker-name.your-subdomain.workers.dev"
 # R2_ACCESS_KEY_ID
 # R2_SECRET_ACCESS_KEY
 
+# 单 Worker 同源部署：Worker 同时托管前端静态资源与 API
+[assets]
+directory = "../frontend/dist"
+binding = "ASSETS"
+
 [[d1_databases]]
 binding = "DB"
 database_name = "memos"
-database_id = "YOUR_D1_DATABASE_ID"
+database_id = "b14d1661-a470-4fbd-bb71-f8600340ab54"
 
 [[r2_buckets]]
 binding = "R2"
