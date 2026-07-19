@@ -1,40 +1,51 @@
-import { Button, Input, Textarea } from "@/components/ui/mui";
 import { isEqual } from "lodash-es";
 import { XIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "react-hot-toast";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { useAuth } from "@/contexts/AuthContext";
+import { useInstance } from "@/contexts/InstanceContext";
 import { convertFileToBase64 } from "@/helpers/utils";
 import useCurrentUser from "@/hooks/useCurrentUser";
-import { userStore, workspaceStore } from "@/store/v2";
-import { User as UserPb } from "@/types/proto/api/v1/user_service";
+import { useUpdateUser } from "@/hooks/useUserQueries";
+import { handleError } from "@/lib/error";
 import { useTranslate } from "@/utils/i18n";
-import { generateDialog } from "./Dialog";
 import UserAvatar from "./UserAvatar";
 
-type Props = DialogProps;
+interface Props {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSuccess?: () => void;
+}
 
 interface State {
   avatarUrl: string;
   username: string;
-  nickname: string;
+  displayName: string;
   email: string;
   description: string;
 }
 
-const UpdateAccountDialog = ({ destroy }: Props) => {
+function UpdateAccountDialog({ open, onOpenChange, onSuccess }: Props) {
   const t = useTranslate();
   const currentUser = useCurrentUser();
+  const { setCurrentUser } = useAuth();
+  const { generalSetting: instanceGeneralSetting } = useInstance();
+  const { mutateAsync: updateUser } = useUpdateUser();
   const [state, setState] = useState<State>({
-    avatarUrl: currentUser.avatarUrl,
-    username: currentUser.username,
-    nickname: currentUser.nickname,
-    email: currentUser.email,
-    description: currentUser.description,
+    avatarUrl: currentUser?.avatarUrl ?? "",
+    username: currentUser?.username ?? "",
+    displayName: currentUser?.displayName ?? "",
+    email: currentUser?.email ?? "",
+    description: currentUser?.description ?? "",
   });
-  const workspaceGeneralSetting = workspaceStore.state.generalSetting;
 
   const handleCloseBtnClick = () => {
-    destroy();
+    onOpenChange(false);
   };
 
   const setPartialState = (partialState: Partial<State>) => {
@@ -66,9 +77,9 @@ const UpdateAccountDialog = ({ destroy }: Props) => {
     }
   };
 
-  const handleNicknameChanged = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleDisplayNameChanged = (e: React.ChangeEvent<HTMLInputElement>) => {
     setPartialState({
-      nickname: e.target.value as string,
+      displayName: e.target.value as string,
     });
   };
 
@@ -104,114 +115,112 @@ const UpdateAccountDialog = ({ destroy }: Props) => {
 
     try {
       const updateMask = [];
-      if (!isEqual(currentUser.username, state.username)) {
+      if (!isEqual(currentUser?.username, state.username)) {
         updateMask.push("username");
       }
-      if (!isEqual(currentUser.nickname, state.nickname)) {
-        updateMask.push("nickname");
+      if (!isEqual(currentUser?.displayName, state.displayName)) {
+        updateMask.push("display_name");
       }
-      if (!isEqual(currentUser.email, state.email)) {
+      if (!isEqual(currentUser?.email, state.email)) {
         updateMask.push("email");
       }
-      if (!isEqual(currentUser.avatarUrl, state.avatarUrl)) {
+      if (!isEqual(currentUser?.avatarUrl, state.avatarUrl)) {
         updateMask.push("avatar_url");
       }
-      if (!isEqual(currentUser.description, state.description)) {
+      if (!isEqual(currentUser?.description, state.description)) {
         updateMask.push("description");
       }
-      await userStore.updateUser(
-        UserPb.fromPartial({
-          name: currentUser.name,
+      const updatedUser = await updateUser({
+        user: {
+          name: currentUser?.name,
           username: state.username,
-          nickname: state.nickname,
+          displayName: state.displayName,
           email: state.email,
           avatarUrl: state.avatarUrl,
           description: state.description,
-        }),
+        },
         updateMask,
-      );
+      });
+      setCurrentUser(updatedUser);
       toast.success(t("message.update-succeed"));
-      handleCloseBtnClick();
-    } catch (error: any) {
-      console.error(error);
-      toast.error(error.details);
+      onSuccess?.();
+      onOpenChange(false);
+    } catch (error: unknown) {
+      await handleError(error, toast.error, {
+        context: "Update account",
+      });
     }
   };
 
   return (
-    <div className="max-w-full shadow flex flex-col justify-start items-start bg-white dark:bg-zinc-800 dark:text-gray-300 p-4 rounded-lg">
-      <div className="flex flex-row justify-between items-center mb-4 gap-2 w-full">
-        <p className="title-text">{t("setting.account-section.update-information")}</p>
-        <Button variant="plain" onClick={handleCloseBtnClick}>
-          <XIcon className="w-5 h-auto" />
-        </Button>
-      </div>
-      <div className="flex flex-col justify-start items-start w-64! space-y-2">
-        <div className="w-full flex flex-row justify-start items-center">
-          <span className="text-sm mr-2">{t("common.avatar")}</span>
-          <label className="relative cursor-pointer hover:opacity-80">
-            <UserAvatar className="w-10! h-10!" avatarUrl={state.avatarUrl} />
-            <input type="file" accept="image/*" className="absolute invisible w-full h-full inset-0" onChange={handleAvatarChanged} />
-          </label>
-          {state.avatarUrl && (
-            <XIcon
-              className="w-4 h-auto ml-1 cursor-pointer opacity-60 hover:opacity-80"
-              onClick={() =>
-                setPartialState({
-                  avatarUrl: "",
-                })
-              }
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>{t("setting.account.update-information")}</DialogTitle>
+        </DialogHeader>
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-row items-center gap-2">
+            <Label>{t("common.avatar")}</Label>
+            <label className="relative cursor-pointer hover:opacity-80">
+              <UserAvatar className="w-10 h-10" avatarUrl={state.avatarUrl} />
+              <input type="file" accept="image/*" className="absolute invisible w-full h-full inset-0" onChange={handleAvatarChanged} />
+            </label>
+            {state.avatarUrl && (
+              <XIcon
+                className="w-4 h-auto cursor-pointer opacity-60 hover:opacity-80"
+                onClick={() =>
+                  setPartialState({
+                    avatarUrl: "",
+                  })
+                }
+              />
+            )}
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="username">
+              {t("common.username")}
+              <span className="text-sm text-muted-foreground ml-1">({t("setting.account.username-note")})</span>
+            </Label>
+            <Input
+              id="username"
+              value={state.username}
+              onChange={handleUsernameChanged}
+              disabled={instanceGeneralSetting.disallowChangeUsername}
             />
-          )}
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="displayName">
+              {t("common.nickname")}
+              <span className="text-sm text-muted-foreground ml-1">({t("setting.account.nickname-note")})</span>
+            </Label>
+            <Input
+              id="displayName"
+              value={state.displayName}
+              onChange={handleDisplayNameChanged}
+              disabled={instanceGeneralSetting.disallowChangeNickname}
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="email">
+              {t("common.email")}
+              <span className="text-sm text-muted-foreground ml-1">({t("setting.account.email-note")})</span>
+            </Label>
+            <Input id="email" type="email" value={state.email} onChange={handleEmailChanged} />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="description">{t("common.description")}</Label>
+            <Textarea id="description" rows={2} value={state.description} onChange={handleDescriptionChanged} />
+          </div>
         </div>
-        <p className="text-sm">
-          {t("common.username")}
-          <span className="text-sm text-gray-400 ml-1">({t("setting.account-section.username-note")})</span>
-        </p>
-        <Input
-          className="w-full"
-          value={state.username}
-          onChange={handleUsernameChanged}
-          disabled={workspaceGeneralSetting.disallowChangeUsername}
-        />
-        <p className="text-sm">
-          {t("common.nickname")}
-          <span className="text-sm text-gray-400 ml-1">({t("setting.account-section.nickname-note")})</span>
-        </p>
-        <Input
-          className="w-full"
-          value={state.nickname}
-          onChange={handleNicknameChanged}
-          disabled={workspaceGeneralSetting.disallowChangeNickname}
-        />
-        <p className="text-sm">
-          {t("common.email")}
-          <span className="text-sm text-gray-400 ml-1">({t("setting.account-section.email-note")})</span>
-        </p>
-        <Input fullWidth type="email" value={state.email} onChange={handleEmailChanged} />
-        <p className="text-sm">{t("common.description")}</p>
-        <Textarea rows={2} fullWidth value={state.description} onChange={handleDescriptionChanged} />
-        <div className="w-full flex flex-row justify-end items-center pt-4 space-x-2">
-          <Button variant="plain" onClick={handleCloseBtnClick}>
+        <DialogFooter>
+          <Button variant="ghost" onClick={handleCloseBtnClick}>
             {t("common.cancel")}
           </Button>
-          <Button color="primary" onClick={handleSaveBtnClick}>
-            {t("common.save")}
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-function showUpdateAccountDialog() {
-  generateDialog(
-    {
-      className: "update-account-dialog",
-      dialogName: "update-account-dialog",
-    },
-    UpdateAccountDialog,
+          <Button onClick={handleSaveBtnClick}>{t("common.save")}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
-export default showUpdateAccountDialog;
+export default UpdateAccountDialog;

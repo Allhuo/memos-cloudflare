@@ -1,0 +1,108 @@
+import type { Attachment } from "@/types/proto/api/v1/attachment_service_pb";
+import type { MemoRelation } from "@/types/proto/api/v1/memo_service_pb";
+import type { LocalFile } from "../types/attachment";
+import type { AudioRecorderPermission, AudioRecorderStatus, EditorAction, EditorState, LoadingKey } from "./types";
+
+export const editorActions = {
+  initMemo: (payload: { content: string; metadata: EditorState["metadata"]; timestamps: EditorState["timestamps"] }): EditorAction => ({
+    type: "INIT_MEMO",
+    payload,
+  }),
+
+  updateContent: (content: string): EditorAction => ({
+    type: "UPDATE_CONTENT",
+    payload: content,
+  }),
+
+  setMetadata: (metadata: Partial<EditorState["metadata"]>): EditorAction => ({
+    type: "SET_METADATA",
+    payload: metadata,
+  }),
+
+  addAttachment: (attachment: Attachment): EditorAction => ({
+    type: "ADD_ATTACHMENT",
+    payload: attachment,
+  }),
+
+  removeAttachment: (name: string): EditorAction => ({
+    type: "REMOVE_ATTACHMENT",
+    payload: name,
+  }),
+
+  addRelation: (relation: MemoRelation): EditorAction => ({
+    type: "ADD_RELATION",
+    payload: relation,
+  }),
+
+  removeRelation: (name: string): EditorAction => ({
+    type: "REMOVE_RELATION",
+    payload: name,
+  }),
+
+  addLocalFile: (file: LocalFile): EditorAction => ({
+    type: "ADD_LOCAL_FILE",
+    payload: file,
+  }),
+
+  removeLocalFile: (previewUrl: string): EditorAction => ({
+    type: "REMOVE_LOCAL_FILE",
+    payload: previewUrl,
+  }),
+
+  setLocalFiles: (files: LocalFile[]): EditorAction => ({
+    type: "SET_LOCAL_FILES",
+    payload: files,
+  }),
+
+  clearLocalFiles: (): EditorAction => ({
+    type: "CLEAR_LOCAL_FILES",
+  }),
+
+  toggleFocusMode: (): EditorAction => ({
+    type: "TOGGLE_FOCUS_MODE",
+  }),
+
+  setLoading: (key: LoadingKey, value: boolean): EditorAction => ({
+    type: "SET_LOADING",
+    payload: { key, value },
+  }),
+
+  setComposing: (value: boolean): EditorAction => ({
+    type: "SET_COMPOSING",
+    payload: value,
+  }),
+
+  setTimestamps: (timestamps: Partial<EditorState["timestamps"]>): EditorAction => ({
+    type: "SET_TIMESTAMPS",
+    payload: timestamps,
+  }),
+
+  setAudioRecorderSupport: (value: boolean): EditorAction => ({
+    type: "SET_AUDIO_RECORDER_SUPPORT",
+    payload: value,
+  }),
+
+  setAudioRecorderPermission: (value: AudioRecorderPermission): EditorAction => ({
+    type: "SET_AUDIO_RECORDER_PERMISSION",
+    payload: value,
+  }),
+
+  setAudioRecorderStatus: (value: AudioRecorderStatus): EditorAction => ({
+    type: "SET_AUDIO_RECORDER_STATUS",
+    payload: value,
+  }),
+
+  setAudioRecorderElapsed: (value: number): EditorAction => ({
+    type: "SET_AUDIO_RECORDER_ELAPSED",
+    payload: value,
+  }),
+
+  setAudioRecorderError: (value?: string): EditorAction => ({
+    type: "SET_AUDIO_RECORDER_ERROR",
+    payload: value,
+  }),
+
+  reset: (): EditorAction => ({
+    type: "RESET",
+  }),
+};

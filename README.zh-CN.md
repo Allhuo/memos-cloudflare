@@ -6,7 +6,7 @@
 
 [English](README.md) | 中文
 
-把开源自托管笔记应用 [Memos](https://github.com/usememos/memos) 完整部署在 Cloudflare 免费额度上：**Workers**（后端）+ **D1**（SQLite 数据库）+ **R2**（文件存储）+ **Pages**（前端）。无需服务器、无需 Docker，个人使用零成本。
+把开源自托管笔记应用 [Memos](https://github.com/usememos/memos) 完整部署在 Cloudflare 免费额度上：**Workers**(前端 + API)+ **D1**(SQLite 数据库)+ **R2**(文件存储)。无需服务器、无需 Docker,个人使用零成本。
 
 ## 为什么做这个项目
 
@@ -16,59 +16,48 @@
 - 🗄️ **D1 数据库**：基于 SQLite 的分布式存储
 - 📁 **R2 存储**：支持文件/图片上传
 - 🔐 **JWT 认证** + 可配置 CORS
-- 🎯 **API 兼容** Memos v0.24.x（见[上游兼容性](#上游兼容性)）
+- 🎯 **对齐上游 Memos v0.29**(Connect API、客户端 markdown 渲染、会话认证)
 
 ## 快速部署
 
-### 1. 克隆项目
+单 Worker 部署(推荐):一个 Worker 同时托管前端与 API——同源,无需任何 CORS/cookie 配置。
 
 ```bash
 git clone https://github.com/Allhuo/memos-cloudflare.git
 cd memos-cloudflare
-```
 
-### 2. 部署后端（Worker）
+# 1. 构建前端(Worker 会把 frontend/dist 作为静态资源托管)
+cd frontend
+npm install -g pnpm@11   # 或 corepack enable
+pnpm install && pnpm build
 
-```bash
-cd backend
+# 2. 创建 Cloudflare 资源
+cd ../backend
 npm install
+npx wrangler d1 create memos             # 把 database_id 填入 wrangler.toml
+npx wrangler r2 bucket create memos-assets
 
-# 创建 D1 数据库
-npx wrangler d1 create memos
+# 3. 初始化数据库(v2 schema,对齐上游 v0.29)
+npx wrangler d1 execute memos --remote --file schema-v2.sql
 
-# 复制配置模板，填入你的数据库 ID
-cp wrangler.toml.example wrangler.toml
+# 4. 设置 JWT 密钥
+npx wrangler secret put JWT_SECRET       # 建议用 openssl rand -base64 32 生成
 
-# 初始化数据库
-npx wrangler d1 execute memos --remote --file schema.sql
-
-# 设置密钥
-npx wrangler secret put JWT_SECRET        # 建议用 openssl rand -base64 32 生成
-npx wrangler secret put ALLOWED_ORIGINS   # 如 https://your-frontend.pages.dev
-
-# 部署
+# 5. 部署
 npx wrangler deploy
 ```
 
-### 3. 部署前端（Pages）
+你的实例即上线于 `https://memos-cloudflare.<你的子域>.workers.dev`。
 
-1. 在 Cloudflare Dashboard 创建 Pages 项目并连接你的仓库
-2. 构建设置：
-   ```
-   Framework preset: Vite
-   Root directory: frontend
-   Build command: npm install && npm run build
-   Build output directory: dist
-   Node.js version: 20
-   ```
-3. 环境变量：
-   ```
-   VITE_API_BASE_URL=https://your-worker-name.your-subdomain.workers.dev
-   ```
+<details>
+<summary>备选:分离部署(Pages 前端 + Worker API)</summary>
 
-### 4. 登录
+用 `VITE_API_BASE_URL=https://your-worker.workers.dev` 构建前端并把 `frontend/dist` 部署到 Cloudflare Pages;从 `wrangler.toml` 删除 `[assets]` 段;把 `ALLOWED_ORIGINS` 设为 Pages 域名。注意:跨站 cookie 需要浏览器允许 `SameSite=None` 第三方 cookie。
+</details>
 
-默认账号：`admin` / `123456` ——**首次登录后请立即修改密码。**
+### 登录
+
+默认账号:`admin` / `123456` ——**首次登录后请立即修改密码。**
 
 ## 配置说明
 
@@ -91,11 +80,13 @@ CORS 配置问题。检查 `ALLOWED_ORIGINS` 是否包含前端域名（注意�
 <details>
 <summary><b>admin / 123456 无法登录</b></summary>
 
-如果你用 2026 年 7 月之前的 schema 初始化过数据库，种子密码哈希有误（[#1](https://github.com/Allhuo/memos-cloudflare/issues/1)，已修复）。执行以下命令重置：
+把管理员密码重置回 `123456`(v2 schema):
 
 ```bash
-npx wrangler d1 execute memos --remote --command "UPDATE user SET password_hash = '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92' WHERE username = 'admin'"
+npx wrangler d1 execute memos --remote --command "UPDATE user SET password_hash = 'pbkdf2\$100000\$UMwJUlX+C0KYrCbG1r8H6A==\$SP5js+HSEHyvYH30GMBZIygmbqktKmorLJtdztfX72Y=' WHERE username = 'admin'"
 ```
+
+(旧版 v1 schema 的同类问题见 [#1](https://github.com/Allhuo/memos-cloudflare/issues/1),那时应使用该 issue 中的 SHA-256 值。)
 </details>
 
 <details>
@@ -103,13 +94,15 @@ npx wrangler d1 execute memos --remote --command "UPDATE user SET password_hash 
 
 ```bash
 npx wrangler d1 list                                          # 确认数据库存在
-npx wrangler d1 execute memos --remote --file schema.sql      # 重新执行迁移
+npx wrangler d1 execute memos --remote --file schema-v2.sql   # 重新执行迁移
 ```
 </details>
 
 ## 上游兼容性
 
-本项目当前对齐 **Memos v0.24.x** API。上游已发布 v0.25–v0.29，包含大量变更（会话/刷新令牌认证、`HOST` → `ADMIN` 角色重命名、前端 React Query 重构、SSO 身份关联、链接预览 API 等）。对齐新版上游是中期主要目标——见 [ROADMAP.md](ROADMAP.md) 和 [#3](https://github.com/Allhuo/memos-cloudflare/issues/3)，非常欢迎参与。
+已对齐 **Memos v0.29.1**:前端即上游 web 应用(仅 2 个文件的 fork:Connect JSON transport + 可选跨域 API 地址),后端在 Workers/D1/R2 上重新实现了 Connect API——包括双 token 会话模型、`ListMemos` CEL 过滤器、评论、reaction、分享与链接预览。个别 web 端不调用的 RPC 返回 `unimplemented`;SSO 与语音转写未实测/占位。进度见 [ROADMAP.md](ROADMAP.md)。
+
+从 v1(v0.24 时代)schema 迁移?见 [docs/migrate-v1-to-v2.md](docs/migrate-v1-to-v2.md)。
 
 ## 参与贡献
 
@@ -119,12 +112,12 @@ npx wrangler d1 execute memos --remote --file schema.sql      # 重新执行迁�
 
 ```
 memos-cloudflare/
-├── backend/           # Cloudflare Worker（Hono + D1 + R2）
-│   ├── src/
-│   └── schema.sql
-├── frontend/          # React + Vite（部署在 Cloudflare Pages）
+├── backend/           # Cloudflare Worker:Connect API + 静态资源(Hono + D1 + R2)
+│   ├── src/v2/        # Connect JSON 服务(对齐上游 v0.29)
+│   └── schema-v2.sql
+├── frontend/          # 上游 Memos v0.29.1 web 应用(React + Vite,仅 2 文件 fork)
 │   └── src/
-└── docs/              # 部署文档
+└── docs/              # 部署与迁移文档
 ```
 
 ## 致谢与许可

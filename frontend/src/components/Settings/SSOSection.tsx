@@ -1,113 +1,201 @@
-import { Divider, List, ListItem } from "@mui/joy";
-import { Button } from "@/components/ui/mui";
-import { MoreVerticalIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { MoreVerticalIcon, PlusIcon } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-hot-toast";
-import { Link } from "react-router-dom";
-import { identityProviderServiceClient } from "@/grpcweb";
-import { IdentityProvider } from "@/types/proto/api/v1/idp_service";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import InfoChip from "@/components/Settings/InfoChip";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { identityProviderServiceClient } from "@/connect";
+import { getIdentityProviderTypeLabel, getOAuth2SummaryItems, getSSOProviderUid, type SummaryItem } from "@/helpers/sso-display";
+import { useDialog } from "@/hooks/useDialog";
+import { handleError } from "@/lib/error";
+import { IdentityProvider } from "@/types/proto/api/v1/idp_service_pb";
 import { useTranslate } from "@/utils/i18n";
-import showCreateIdentityProviderDialog from "../CreateIdentityProviderDialog";
+import CreateIdentityProviderDialog from "../CreateIdentityProviderDialog";
 import LearnMore from "../LearnMore";
-import { Popover, PopoverContent, PopoverTrigger } from "../ui/Popover";
+import SettingSection from "./SettingSection";
+import SettingTable from "./SettingTable";
+
+interface IdentityProviderRow extends Record<string, unknown> {
+  name: string;
+  providerUid: string;
+  title: string;
+  typeLabel: string;
+  summaryItems: SummaryItem[];
+  provider: IdentityProvider;
+}
 
 const SSOSection = () => {
   const t = useTranslate();
   const [identityProviderList, setIdentityProviderList] = useState<IdentityProvider[]>([]);
-
-  useEffect(() => {
-    fetchIdentityProviderList();
-  }, []);
+  const [editingIdentityProvider, setEditingIdentityProvider] = useState<IdentityProvider | undefined>();
+  const [deleteTarget, setDeleteTarget] = useState<IdentityProvider | undefined>(undefined);
+  const idpDialog = useDialog();
 
   const fetchIdentityProviderList = async () => {
-    const { identityProviders } = await identityProviderServiceClient.listIdentityProviders({});
-    setIdentityProviderList(identityProviders);
+    try {
+      const { identityProviders } = await identityProviderServiceClient.listIdentityProviders({});
+      setIdentityProviderList(identityProviders);
+    } catch (error: unknown) {
+      handleError(error, toast.error, {
+        context: "Load identity providers",
+      });
+    }
   };
 
-  const handleDeleteIdentityProvider = async (identityProvider: IdentityProvider) => {
-    const confirmed = window.confirm(t("setting.sso-section.confirm-delete", { name: identityProvider.title }));
-    if (confirmed) {
-      try {
-        await identityProviderServiceClient.deleteIdentityProvider({ name: identityProvider.name });
-      } catch (error: any) {
-        console.error(error);
-        toast.error(error.details);
-      }
-      await fetchIdentityProviderList();
+  useEffect(() => {
+    void fetchIdentityProviderList();
+  }, []);
+
+  const rows = useMemo<IdentityProviderRow[]>(
+    () =>
+      identityProviderList.map((provider) => ({
+        name: provider.name,
+        providerUid: getSSOProviderUid(provider.name),
+        title: provider.title,
+        typeLabel: getIdentityProviderTypeLabel(provider.type),
+        summaryItems: getOAuth2SummaryItems(provider, t),
+        provider,
+      })),
+    [identityProviderList, t],
+  );
+
+  const handleDeleteIdentityProvider = (identityProvider: IdentityProvider) => {
+    setDeleteTarget(identityProvider);
+  };
+
+  const confirmDeleteIdentityProvider = async () => {
+    if (!deleteTarget) return;
+    try {
+      await identityProviderServiceClient.deleteIdentityProvider({ name: deleteTarget.name });
+    } catch (error: unknown) {
+      handleError(error, toast.error, {
+        context: "Delete identity provider",
+      });
+    }
+    await fetchIdentityProviderList();
+    setDeleteTarget(undefined);
+  };
+
+  const handleCreateIdentityProvider = () => {
+    setEditingIdentityProvider(undefined);
+    idpDialog.open();
+  };
+
+  const handleEditIdentityProvider = (identityProvider: IdentityProvider) => {
+    setEditingIdentityProvider(identityProvider);
+    idpDialog.open();
+  };
+
+  const handleDialogSuccess = async () => {
+    await fetchIdentityProviderList();
+    idpDialog.close();
+    setEditingIdentityProvider(undefined);
+  };
+
+  const handleDialogOpenChange = (open: boolean) => {
+    idpDialog.setOpen(open);
+    if (!open) {
+      setEditingIdentityProvider(undefined);
     }
   };
 
   return (
-    <div className="w-full flex flex-col gap-2 pt-2 pb-4">
-      <div className="w-full flex flex-row justify-between items-center gap-1">
-        <div className="flex flex-row items-center gap-1">
-          <span className="font-mono text-gray-400">{t("setting.sso-section.sso-list")}</span>
-          <LearnMore url="https://www.usememos.com/docs/advanced-settings/sso" />
+    <SettingSection
+      title={
+        <div className="flex items-center gap-2">
+          <span>{t("setting.sso.sso-list")}</span>
+          <LearnMore url="https://usememos.com/docs/configuration/authentication" />
         </div>
-        <Button color="primary" onClick={() => showCreateIdentityProviderDialog(undefined, fetchIdentityProviderList)}>
+      }
+      actions={
+        <Button onClick={handleCreateIdentityProvider}>
+          <PlusIcon className="w-4 h-4 mr-2" />
           {t("common.create")}
         </Button>
-      </div>
-      <Divider />
-      {identityProviderList.map((identityProvider) => (
-        <div
-          key={identityProvider.name}
-          className="py-2 w-full border-b last:border-b dark:border-zinc-700 flex flex-row items-center justify-between"
-        >
-          <div className="flex flex-row items-center">
-            <p className="ml-2">
-              {identityProvider.title}
-              <span className="text-sm ml-1 opacity-40">({identityProvider.type})</span>
-            </p>
-          </div>
-          <div className="flex flex-row items-center">
-            <Popover>
-              <PopoverTrigger asChild>
-                <button className="flex items-center justify-center p-1 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded">
-                  <MoreVerticalIcon className="w-4 h-auto" />
-                </button>
-              </PopoverTrigger>
-              <PopoverContent align="end" sideOffset={2}>
-                <div className="flex flex-col gap-0.5 text-sm">
-                  <button
-                    onClick={() => showCreateIdentityProviderDialog(identityProvider, fetchIdentityProviderList)}
-                    className="flex items-center gap-2 px-2 py-1 text-left dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-700 outline-none rounded"
-                  >
-                    {t("common.edit")}
-                  </button>
-                  <button
-                    onClick={() => handleDeleteIdentityProvider(identityProvider)}
-                    className="flex items-center gap-2 px-2 py-1 text-left text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-zinc-700 outline-none rounded"
+      }
+    >
+      <SettingTable
+        variant="info-flow"
+        columns={[
+          {
+            key: "title",
+            header: t("setting.sso.provider"),
+            render: (_, row: IdentityProviderRow) => (
+              <div className="flex min-w-[16rem] flex-col gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-medium text-foreground">{row.title}</span>
+                  <Badge variant="secondary" className="rounded-full px-2.5 py-0.5">
+                    {row.typeLabel}
+                  </Badge>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <InfoChip label={t("setting.sso.provider-uid")} value={row.providerUid} />
+                </div>
+              </div>
+            ),
+          },
+          {
+            key: "summaryItems",
+            header: t("setting.sso.configuration"),
+            render: (_, row: IdentityProviderRow) => (
+              <div className="flex min-w-[24rem] flex-col gap-2">
+                <p className="text-xs text-muted-foreground">{t("setting.sso.configuration-summary-description")}</p>
+                <div className="flex flex-wrap gap-2">
+                  {row.summaryItems.map((item) => (
+                    <InfoChip key={item.key} label={item.label} value={item.value} tooltip={item.tooltip} />
+                  ))}
+                </div>
+              </div>
+            ),
+          },
+          {
+            key: "actions",
+            header: "",
+            className: "w-px text-right",
+            render: (_, row: IdentityProviderRow) => (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <MoreVerticalIcon className="w-4 h-auto" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" sideOffset={2}>
+                  <DropdownMenuItem onClick={() => handleEditIdentityProvider(row.provider)}>{t("common.edit")}</DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => handleDeleteIdentityProvider(row.provider)}
+                    className="text-destructive focus:text-destructive"
                   >
                     {t("common.delete")}
-                  </button>
-                </div>
-              </PopoverContent>
-            </Popover>
-          </div>
-        </div>
-      ))}
-      {identityProviderList.length === 0 && (
-        <div className="w-full mt-2 text-sm dark:border-zinc-700 opacity-60 flex flex-row items-center justify-between">
-          <p className="">{t("setting.sso-section.no-sso-found")}</p>
-        </div>
-      )}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ),
+          },
+        ]}
+        data={rows}
+        emptyMessage={t("setting.sso.no-sso-found")}
+        getRowKey={(row) => row.name}
+      />
 
-      <div className="w-full mt-4">
-        <p className="text-sm">{t("common.learn-more")}:</p>
-        <List component="ul" marker="disc" size="sm">
-          <ListItem>
-            <Link
-              className="text-sm text-blue-600 hover:underline"
-              to="https://www.usememos.com/docs/advanced-settings/sso"
-              target="_blank"
-            >
-              {t("setting.sso-section.single-sign-on")}
-            </Link>
-          </ListItem>
-        </List>
-      </div>
-    </div>
+      <CreateIdentityProviderDialog
+        open={idpDialog.isOpen}
+        onOpenChange={handleDialogOpenChange}
+        identityProvider={editingIdentityProvider}
+        onSuccess={handleDialogSuccess}
+      />
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => !open && setDeleteTarget(undefined)}
+        title={deleteTarget ? t("setting.sso.confirm-delete", { name: deleteTarget.title }) : ""}
+        confirmLabel={t("common.delete")}
+        cancelLabel={t("common.cancel")}
+        onConfirm={confirmDeleteIdentityProvider}
+        confirmVariant="destructive"
+      />
+    </SettingSection>
   );
 };
 

@@ -1,56 +1,81 @@
-import { observer } from "mobx-react-lite";
-import { useContext } from "react";
+import type { Element } from "hast";
 import { useLocation } from "react-router-dom";
+import { useInstance } from "@/contexts/InstanceContext";
+import { type MemoFilter, stringifyFilters, useMemoFilterContext } from "@/contexts/MemoFilterContext";
 import useNavigateTo from "@/hooks/useNavigateTo";
+import { colorToHex } from "@/lib/color";
+import { findTagMetadata } from "@/lib/tag";
+import { cn } from "@/lib/utils";
 import { Routes } from "@/router";
-import { memoFilterStore } from "@/store/v2";
-import { stringifyFilters, MemoFilter } from "@/store/v2/memoFilter";
-import { cn } from "@/utils";
-import { RendererContext } from "./types";
+import { useMemoViewContext } from "../MemoView/MemoViewContext";
 
-interface Props {
-  content: string;
+interface TagProps extends React.HTMLAttributes<HTMLSpanElement> {
+  node?: Element; // AST node from react-markdown
+  "data-tag"?: string;
+  children?: React.ReactNode;
 }
 
-const Tag = observer(({ content }: Props) => {
-  const context = useContext(RendererContext);
+export const Tag: React.FC<TagProps> = ({ "data-tag": dataTag, children, className, style, node: _node, ...props }) => {
+  const { parentPage } = useMemoViewContext();
   const location = useLocation();
   const navigateTo = useNavigateTo();
+  const { getFiltersByFactor, removeFilter, addFilter } = useMemoFilterContext();
+  const { tagsSetting } = useInstance();
 
-  const handleTagClick = () => {
-    if (context.disableFilter) {
-      return;
-    }
+  const tag = dataTag || "";
+
+  // Custom color from admin tag metadata. Dynamic hex values must use inline styles
+  // because Tailwind can't scan dynamically constructed class names.
+  // Text uses a darkened variant (40% color + black) for contrast on light backgrounds.
+  const bgHex = colorToHex(findTagMetadata(tag, tagsSetting)?.backgroundColor);
+  const tagStyle: React.CSSProperties | undefined = bgHex
+    ? {
+        borderColor: bgHex,
+        color: `color-mix(in srgb, ${bgHex} 60%, black)`,
+        backgroundColor: `color-mix(in srgb, ${bgHex} 15%, transparent)`,
+        ...style,
+      }
+    : style;
+
+  const handleTagClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
 
     // If the tag is clicked in a memo detail page, we should navigate to the memo list page.
     if (location.pathname.startsWith("/m")) {
-      const pathname = context.parentPage || Routes.ROOT;
+      const pathname = parentPage || Routes.HOME;
       const searchParams = new URLSearchParams();
 
-      searchParams.set("filter", stringifyFilters([{ factor: "tagSearch", value: content }]));
+      searchParams.set("filter", stringifyFilters([{ factor: "tagSearch", value: tag }]));
       navigateTo(`${pathname}?${searchParams.toString()}`);
       return;
     }
 
-    const isActive = memoFilterStore.getFiltersByFactor("tagSearch").some((filter: MemoFilter) => filter.value === content);
+    const isActive = getFiltersByFactor("tagSearch").some((filter: MemoFilter) => filter.value === tag);
     if (isActive) {
-      memoFilterStore.removeFilter((f: MemoFilter) => f.factor === "tagSearch" && f.value === content);
+      removeFilter((f: MemoFilter) => f.factor === "tagSearch" && f.value === tag);
     } else {
-      memoFilterStore.addFilter({
+      // Remove all existing tag filters first, then add the new one
+      removeFilter((f: MemoFilter) => f.factor === "tagSearch");
+      addFilter({
         factor: "tagSearch",
-        value: content,
+        value: tag,
       });
     }
   };
 
   return (
     <span
-      className={cn("inline-block w-auto text-blue-600 dark:text-blue-400", context.disableFilter ? "" : "cursor-pointer hover:opacity-80")}
+      className={cn(
+        "inline-flex items-center align-baseline px-1.5 py-0.5 text-[0.9em] leading-none font-normal rounded-full border cursor-pointer transition-opacity hover:opacity-75",
+        !bgHex && "border-primary text-primary bg-primary/15",
+        className,
+      )}
+      style={tagStyle}
+      data-tag={tag}
+      {...props}
       onClick={handleTagClick}
     >
-      #{content}
+      {children}
     </span>
   );
-});
-
-export default Tag;
+};

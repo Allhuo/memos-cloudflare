@@ -1,34 +1,101 @@
-import { useColorScheme } from "@mui/joy";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { cn } from "@/lib/utils";
+import { getThemeWithFallback, resolveTheme, setupSystemThemeListener } from "@/utils/theme";
+import { extractCodeContent } from "./utils";
 
-interface Props {
-  content: string;
+interface MermaidBlockProps {
+  children?: React.ReactNode;
+  className?: string;
 }
 
-const MermaidBlock: React.FC<Props> = ({ content }: Props) => {
-  const { mode: colorMode } = useColorScheme();
-  const mermaidDockBlock = useRef<null>(null);
+type MermaidTheme = "default" | "dark";
 
+const toMermaidTheme = (appTheme: string): MermaidTheme => (appTheme === "default-dark" ? "dark" : "default");
+
+const formatErrorMessage = (err: unknown): string => {
+  const msg = err instanceof Error ? err.message : "Failed to render diagram";
+  if (/no diagram type detected/i.test(msg)) {
+    return `${msg} — check that the diagram type is valid (e.g. sequenceDiagram, classDiagram, erDiagram)`;
+  }
+  return msg;
+};
+
+export const MermaidBlock = ({ children, className }: MermaidBlockProps) => {
+  const { userGeneralSetting } = useAuth();
+  const [svg, setSvg] = useState<string>("");
+  const [error, setError] = useState<string>("");
+  const [systemThemeChange, setSystemThemeChange] = useState(0);
+
+  const codeContent = extractCodeContent(children);
+  const themePreference = getThemeWithFallback(userGeneralSetting?.theme);
+  const currentTheme = useMemo(() => resolveTheme(themePreference), [themePreference, systemThemeChange]);
+
+  // Re-resolve theme when OS preference changes (only relevant when using "system" theme)
   useEffect(() => {
-    // Dynamically import mermaid to ensure compatibility with Vite
-    const initializeMermaid = async () => {
-      const mermaid = (await import("mermaid")).default;
-      mermaid.initialize({ startOnLoad: false, theme: colorMode == "dark" ? "dark" : "default" });
-      if (mermaidDockBlock.current) {
-        mermaid.run({
-          nodes: [mermaidDockBlock.current],
+    if (themePreference !== "system") return;
+    return setupSystemThemeListener(() => setSystemThemeChange((n) => n + 1));
+  }, [themePreference]);
+
+  // Render diagram when content or theme changes
+  useEffect(() => {
+    if (!codeContent) {
+      setSvg("");
+      setError("");
+      return;
+    }
+
+    let cancelled = false;
+
+    const renderDiagram = async () => {
+      try {
+        const { default: mermaid } = await import("mermaid");
+        if (cancelled) return;
+
+        mermaid.initialize({
+          startOnLoad: false,
+          theme: toMermaidTheme(currentTheme),
+          securityLevel: "strict",
+          fontFamily: "inherit",
+          suppressErrorRendering: true,
         });
+
+        const id = `mermaid-${Math.random().toString(36).substring(7)}`;
+        const { svg: renderedSvg } = await mermaid.render(id, codeContent);
+        if (cancelled) return;
+
+        setSvg(renderedSvg);
+        setError("");
+      } catch (err) {
+        if (cancelled) return;
+        console.error("Failed to render mermaid diagram:", err);
+        setSvg("");
+        setError(formatErrorMessage(err));
       }
     };
 
-    initializeMermaid();
-  }, [content]);
+    renderDiagram();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [codeContent, currentTheme]);
+
+  if (error) {
+    return (
+      <div className="w-full">
+        <div className="text-sm text-destructive mb-2 whitespace-normal break-words">Mermaid Error: {error}</div>
+        <code className="block language-mermaid whitespace-pre text-sm">{codeContent}</code>
+      </div>
+    );
+  }
+
+  if (!svg) return null;
 
   return (
-    <pre ref={mermaidDockBlock} className="w-full p-2 whitespace-pre-wrap relative">
-      {content}
-    </pre>
+    <div
+      className={cn("mermaid-diagram w-full flex justify-center items-center my-2 overflow-x-auto", className)}
+      dangerouslySetInnerHTML={{ __html: svg }}
+    />
   );
 };
-
-export default MermaidBlock;

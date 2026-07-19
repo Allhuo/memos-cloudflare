@@ -9,6 +9,8 @@ export interface Env {
   R2_ACCESS_KEY_ID?: string;
   R2_SECRET_ACCESS_KEY?: string;
   R2?: R2Bucket;
+  /** Workers 静态资源绑定（单 Worker 同源部署：Worker 同时托管前端与 API） */
+  ASSETS?: Fetcher;
   BASE_URL: string;
   LOG_LEVEL?: string;
 }

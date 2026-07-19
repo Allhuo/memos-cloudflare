@@ -6,7 +6,7 @@
 
 English | [中文](README.zh-CN.md)
 
-Deploy [Memos](https://github.com/usememos/memos) — the open-source, self-hosted note-taking app — entirely on Cloudflare's free tier: **Workers** (backend) + **D1** (SQLite database) + **R2** (file storage) + **Pages** (frontend). No server, no Docker, no cost for personal use.
+Deploy [Memos](https://github.com/usememos/memos) — the open-source, self-hosted note-taking app — entirely on Cloudflare's free tier: **Workers** (frontend + API) + **D1** (SQLite database) + **R2** (file storage). No server, no Docker, no cost for personal use.
 
 ## Why this project
 
@@ -16,57 +16,46 @@ The official Memos requires a server running Docker. This project reimplements t
 - 🗄️ **D1 database**: SQLite-backed distributed storage
 - 📁 **R2 storage**: file/image upload support
 - 🔐 **JWT authentication** with configurable CORS
-- 🎯 **API compatible** with Memos v0.24.x (see [upstream status](#upstream-compatibility))
+- 🎯 **Aligned with upstream Memos v0.29** (Connect API, client-side markdown, session auth)
 
 ## Quick start
 
-### 1. Clone
+Single-Worker deployment (recommended): one Worker serves both the frontend and the API — same origin, no CORS/cookie configuration.
 
 ```bash
 git clone https://github.com/Allhuo/memos-cloudflare.git
 cd memos-cloudflare
-```
 
-### 2. Deploy the backend (Worker)
+# 1. Build the frontend (the Worker serves frontend/dist as static assets)
+cd frontend
+npm install -g pnpm@11   # or: corepack enable
+pnpm install && pnpm build
 
-```bash
-cd backend
+# 2. Create Cloudflare resources
+cd ../backend
 npm install
+npx wrangler d1 create memos             # copy the database_id into wrangler.toml
+npx wrangler r2 bucket create memos-assets
 
-# Create the D1 database
-npx wrangler d1 create memos
+# 3. Initialize the database (v2 schema, aligned with upstream v0.29)
+npx wrangler d1 execute memos --remote --file schema-v2.sql
 
-# Copy the config template and fill in your database ID
-cp wrangler.toml.example wrangler.toml
+# 4. Set the JWT secret
+npx wrangler secret put JWT_SECRET       # e.g. output of: openssl rand -base64 32
 
-# Initialize the schema
-npx wrangler d1 execute memos --remote --file schema.sql
-
-# Set secrets
-npx wrangler secret put JWT_SECRET        # e.g. output of: openssl rand -base64 32
-npx wrangler secret put ALLOWED_ORIGINS   # e.g. https://your-frontend.pages.dev
-
-# Deploy
+# 5. Deploy
 npx wrangler deploy
 ```
 
-### 3. Deploy the frontend (Pages)
+Your instance is now live at `https://memos-cloudflare.<your-subdomain>.workers.dev`.
 
-1. Create a Cloudflare Pages project connected to your fork
-2. Build settings:
-   ```
-   Framework preset: Vite
-   Root directory: frontend
-   Build command: npm install && npm run build
-   Build output directory: dist
-   Node.js version: 20
-   ```
-3. Environment variable:
-   ```
-   VITE_API_BASE_URL=https://your-worker-name.your-subdomain.workers.dev
-   ```
+<details>
+<summary>Alternative: split deployment (Pages frontend + Worker API)</summary>
 
-### 4. Sign in
+Build the frontend with `VITE_API_BASE_URL=https://your-worker.workers.dev` and deploy `frontend/dist` to Cloudflare Pages; remove the `[assets]` section from `wrangler.toml`. Set `ALLOWED_ORIGINS` as a Worker secret to your Pages origin. Note: cross-site cookies require the browser to accept `SameSite=None` third-party cookies.
+</details>
+
+### Sign in
 
 Default account: `admin` / `123456` — **change the password immediately after first login.**
 
@@ -91,11 +80,13 @@ CORS misconfiguration. Check that `ALLOWED_ORIGINS` contains your exact frontend
 <details>
 <summary><b>Cannot log in with admin / 123456</b></summary>
 
-If you initialized the database with a schema from before 2026-07, the seeded password hash was wrong ([#1](https://github.com/Allhuo/memos-cloudflare/issues/1), fixed since). Reset it:
+Reset the admin password back to `123456` (v2 schema):
 
 ```bash
-npx wrangler d1 execute memos --remote --command "UPDATE user SET password_hash = '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92' WHERE username = 'admin'"
+npx wrangler d1 execute memos --remote --command "UPDATE user SET password_hash = 'pbkdf2\$100000\$UMwJUlX+C0KYrCbG1r8H6A==\$SP5js+HSEHyvYH30GMBZIygmbqktKmorLJtdztfX72Y=' WHERE username = 'admin'"
 ```
+
+(On the legacy v1 schema this issue was [#1](https://github.com/Allhuo/memos-cloudflare/issues/1); use the SHA-256 hex value from that issue instead.)
 </details>
 
 <details>
@@ -103,13 +94,15 @@ npx wrangler d1 execute memos --remote --command "UPDATE user SET password_hash 
 
 ```bash
 npx wrangler d1 list                                          # verify the database exists
-npx wrangler d1 execute memos --remote --file schema.sql      # re-run migrations
+npx wrangler d1 execute memos --remote --file schema-v2.sql   # re-run migrations
 ```
 </details>
 
 ## Upstream compatibility
 
-This project currently targets the **Memos v0.24.x** API. Upstream Memos has since shipped v0.25–v0.29 with significant changes (session/refresh-token auth, `HOST` → `ADMIN` role rename, React Query frontend refactor, SSO identity linkage, link-preview APIs). Aligning with newer upstream versions is the main mid-term goal — see [ROADMAP.md](ROADMAP.md) and [#3](https://github.com/Allhuo/memos-cloudflare/issues/3). Help is very welcome.
+Aligned with **Memos v0.29.1**: the frontend is the upstream web app (2-file fork for Connect JSON transport + optional cross-origin API base), and the backend reimplements the Connect API on Workers/D1/R2 — including the dual-token session model, `ListMemos` CEL filters, comments, reactions, shares and link previews. A few RPCs the web UI never calls return `unimplemented`; SSO and audio transcription are untested/stubbed. Progress: [ROADMAP.md](ROADMAP.md).
+
+Migrating from the v1 (v0.24-era) schema? See [docs/migrate-v1-to-v2.md](docs/migrate-v1-to-v2.md).
 
 ## Contributing
 
@@ -119,12 +112,12 @@ Contributions of any size are welcome — bug reports, docs, translations, fixes
 
 ```
 memos-cloudflare/
-├── backend/           # Cloudflare Worker (Hono + D1 + R2)
-│   ├── src/
-│   └── schema.sql
-├── frontend/          # React + Vite (deployed on Cloudflare Pages)
+├── backend/           # Cloudflare Worker: Connect API + static assets (Hono + D1 + R2)
+│   ├── src/v2/        # Connect JSON services (aligned with upstream v0.29)
+│   └── schema-v2.sql
+├── frontend/          # Upstream Memos v0.29.1 web app (React + Vite, 2-file fork)
 │   └── src/
-└── docs/              # Deployment guides
+└── docs/              # Deployment & migration guides
 ```
 
 ## Credits & license

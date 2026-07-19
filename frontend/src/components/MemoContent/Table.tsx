@@ -1,37 +1,77 @@
-import { Node, TableNode_Row } from "@/types/proto/api/v1/markdown_service";
-import Renderer from "./Renderer";
+import { cn } from "@/lib/utils";
+import { NestedMarkdownRenderContext } from "./MarkdownRenderContext";
+import type { ReactMarkdownProps } from "./markdown/types";
 
-interface Props {
-  index: string;
-  header: Node[];
-  rows: TableNode_Row[];
+interface TableProps extends React.HTMLAttributes<HTMLTableElement>, ReactMarkdownProps {
+  children: React.ReactNode;
 }
 
-const Table = ({ header, rows }: Props) => {
+export const Table = ({ children, className, node: _node, ...props }: TableProps) => {
   return (
-    <table className="w-auto max-w-full border border-zinc-200 dark:border-zinc-600 divide-y divide-zinc-200 dark:divide-zinc-600">
-      <thead className="text-sm font-medium leading-5 text-left text-gray-900 dark:text-gray-400">
-        <tr className="divide-x divide-zinc-200 dark:divide-zinc-600">
-          {header.map((h, i) => (
-            <th key={i} className="py-1 px-2">
-              <Renderer key={`${h.type}-${i}`} index={String(i)} node={h} />
-            </th>
-          ))}
-        </tr>
-      </thead>
-      <tbody className="divide-y divide-zinc-200 dark:divide-zinc-600 text-sm leading-5 text-left text-gray-900 dark:text-gray-400">
-        {rows.map((row, i) => (
-          <tr key={i} className="divide-x divide-zinc-200 dark:divide-zinc-600">
-            {row.cells.map((r, j) => (
-              <td key={j} className="py-1 px-2">
-                <Renderer key={`${r.type}-${i}-${j}`} index={String(j)} node={r} />
-              </td>
-            ))}
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <div className="my-2 w-full overflow-x-auto rounded-lg border border-border bg-muted/20">
+      <table className={cn("w-full border-collapse text-sm", className)} {...props}>
+        {children}
+      </table>
+    </div>
   );
 };
 
-export default Table;
+interface TableHeadProps extends React.HTMLAttributes<HTMLTableSectionElement>, ReactMarkdownProps {
+  children: React.ReactNode;
+}
+
+export const TableHead = ({ children, className, node: _node, ...props }: TableHeadProps) => {
+  return (
+    <thead className={cn("border-b border-border bg-muted/30", className)} {...props}>
+      {children}
+    </thead>
+  );
+};
+
+interface TableBodyProps extends React.HTMLAttributes<HTMLTableSectionElement>, ReactMarkdownProps {
+  children: React.ReactNode;
+}
+
+export const TableBody = ({ children, className, node: _node, ...props }: TableBodyProps) => {
+  return (
+    <tbody className={cn("divide-y divide-border", className)} {...props}>
+      {children}
+    </tbody>
+  );
+};
+
+interface TableRowProps extends React.HTMLAttributes<HTMLTableRowElement>, ReactMarkdownProps {
+  children: React.ReactNode;
+}
+
+export const TableRow = ({ children, className, node: _node, ...props }: TableRowProps) => {
+  return (
+    <tr className={cn("transition-colors hover:bg-accent/20", className)} {...props}>
+      {children}
+    </tr>
+  );
+};
+
+interface TableHeaderCellProps extends React.ThHTMLAttributes<HTMLTableCellElement>, ReactMarkdownProps {
+  children: React.ReactNode;
+}
+
+export const TableHeaderCell = ({ children, className, node: _node, ...props }: TableHeaderCellProps) => {
+  return (
+    <th className={cn("px-2 py-1 text-left align-middle text-sm font-medium text-muted-foreground", className)} {...props}>
+      <NestedMarkdownRenderContext>{children}</NestedMarkdownRenderContext>
+    </th>
+  );
+};
+
+interface TableCellProps extends React.TdHTMLAttributes<HTMLTableCellElement>, ReactMarkdownProps {
+  children: React.ReactNode;
+}
+
+export const TableCell = ({ children, className, node: _node, ...props }: TableCellProps) => {
+  return (
+    <td className={cn("px-2 py-1 text-left align-middle text-sm", className)} {...props}>
+      <NestedMarkdownRenderContext>{children}</NestedMarkdownRenderContext>
+    </td>
+  );
+};

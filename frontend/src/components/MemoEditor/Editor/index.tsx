@@ -1,14 +1,18 @@
-import { last } from "lodash-es";
-import { forwardRef, ReactNode, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
-import { markdownServiceClient } from "@/grpcweb";
-import { Node, NodeType, OrderedListItemNode, TaskListItemNode, UnorderedListItemNode } from "@/types/proto/api/v1/markdown_service";
-import { cn } from "@/utils";
+import { type ClipboardEvent, forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef } from "react";
+import getCaretCoordinates from "textarea-caret";
+import { cn } from "@/lib/utils";
+import { EDITOR_HEIGHT } from "../constants";
+import type { EditorProps } from "../types";
+import { editorCommands } from "./commands";
+import SlashCommands from "./SlashCommands";
+import { getMarkdownLinkForPastedUrl } from "./shortcuts";
 import TagSuggestions from "./TagSuggestions";
+import { useListCompletion } from "./useListCompletion";
 
 export interface EditorRefActions {
   getEditor: () => HTMLTextAreaElement | null;
-  focus: FunctionType;
-  scrollToCursor: FunctionType;
+  focus: () => void;
+  scrollToCursor: () => void;
   insertText: (text: string, prefix?: string, suffix?: string) => void;
   removeText: (start: number, length: number) => void;
   setContent: (text: string) => void;
@@ -21,213 +25,210 @@ export interface EditorRefActions {
   setLine: (lineNumber: number, text: string) => void;
 }
 
-interface Props {
-  className: string;
-  initialContent: string;
-  placeholder: string;
-  tools?: ReactNode;
-  onContentChange: (content: string) => void;
-  onPaste: (event: React.ClipboardEvent) => void;
-}
-
-const Editor = forwardRef(function Editor(props: Props, ref: React.ForwardedRef<EditorRefActions>) {
-  const { className, initialContent, placeholder, onPaste, onContentChange: handleContentChangeCallback } = props;
-  const [isInIME, setIsInIME] = useState(false);
+const Editor = forwardRef(function Editor(props: EditorProps, ref: React.ForwardedRef<EditorRefActions>) {
+  const {
+    className,
+    initialContent,
+    placeholder,
+    onPaste,
+    onContentChange: handleContentChangeCallback,
+    isFocusMode,
+    isInIME = false,
+    onCompositionStart,
+    onCompositionEnd,
+  } = props;
   const editorRef = useRef<HTMLTextAreaElement>(null);
+
+  const updateEditorHeight = useCallback(() => {
+    if (editorRef.current) {
+      editorRef.current.style.height = "auto";
+      editorRef.current.style.height = `${editorRef.current.scrollHeight ?? 0}px`;
+    }
+  }, []);
+
+  const updateContent = useCallback(() => {
+    if (editorRef.current) {
+      handleContentChangeCallback(editorRef.current.value);
+      updateEditorHeight();
+    }
+  }, [handleContentChangeCallback, updateEditorHeight]);
+
+  const scrollToCaret = useCallback((options: { force?: boolean } = {}) => {
+    const editor = editorRef.current;
+    if (!editor) return;
+
+    const { force = false } = options;
+    const caret = getCaretCoordinates(editor, editor.selectionEnd);
+
+    if (force) {
+      editor.scrollTop = Math.max(0, caret.top - editor.clientHeight / 2);
+      return;
+    }
+
+    const lineHeight = parseFloat(getComputedStyle(editor).lineHeight) || 24;
+    const viewportBottom = editor.scrollTop + editor.clientHeight;
+    // Scroll if cursor is near or beyond bottom edge (within 2 lines)
+    if (caret.top + lineHeight * 2 > viewportBottom) {
+      editor.scrollTop = Math.max(0, caret.top - editor.clientHeight / 2);
+    }
+  }, []);
 
   useEffect(() => {
     if (editorRef.current && initialContent) {
       editorRef.current.value = initialContent;
       handleContentChangeCallback(initialContent);
+      updateEditorHeight();
     }
+    // Only run once on mount to set initial content
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Update editor when content is externally changed (e.g., reset after save)
   useEffect(() => {
-    if (editorRef.current) {
+    if (editorRef.current && editorRef.current.value !== initialContent) {
+      editorRef.current.value = initialContent;
       updateEditorHeight();
     }
-  }, [editorRef.current?.value]);
+  }, [initialContent, updateEditorHeight]);
 
-  const editorActions = {
-    getEditor: () => {
-      return editorRef.current;
-    },
-    focus: () => {
-      editorRef.current?.focus();
-    },
-    scrollToCursor: () => {
-      if (editorRef.current) {
-        editorRef.current.scrollTop = editorRef.current.scrollHeight;
-      }
-    },
-    insertText: (content = "", prefix = "", suffix = "") => {
-      if (!editorRef.current) {
-        return;
-      }
+  const editorActions: EditorRefActions = useMemo(
+    () => ({
+      getEditor: () => editorRef.current,
+      focus: () => editorRef.current?.focus(),
+      scrollToCursor: () => {
+        scrollToCaret({ force: true });
+      },
+      insertText: (content = "", prefix = "", suffix = "") => {
+        const editor = editorRef.current;
+        if (!editor) return;
 
-      const cursorPosition = editorRef.current.selectionStart;
-      const endPosition = editorRef.current.selectionEnd;
-      const prevValue = editorRef.current.value;
-      const value =
-        prevValue.slice(0, cursorPosition) +
-        prefix +
-        (content || prevValue.slice(cursorPosition, endPosition)) +
-        suffix +
-        prevValue.slice(endPosition);
+        const cursorPos = editor.selectionStart;
+        const endPos = editor.selectionEnd;
+        const prev = editor.value;
+        const actual = content || prev.slice(cursorPos, endPos);
+        editor.value = prev.slice(0, cursorPos) + prefix + actual + suffix + prev.slice(endPos);
 
-      editorRef.current.value = value;
-      editorRef.current.focus();
-      editorRef.current.selectionEnd = endPosition + prefix.length + content.length;
-      handleContentChangeCallback(editorRef.current.value);
-      updateEditorHeight();
-    },
-    removeText: (start: number, length: number) => {
-      if (!editorRef.current) {
-        return;
-      }
+        editor.focus();
+        editor.setSelectionRange(cursorPos + prefix.length + actual.length, cursorPos + prefix.length + actual.length);
+        updateContent();
+      },
+      removeText: (start: number, length: number) => {
+        const editor = editorRef.current;
+        if (!editor) return;
 
-      const prevValue = editorRef.current.value;
-      const value = prevValue.slice(0, start) + prevValue.slice(start + length);
-      editorRef.current.value = value;
-      editorRef.current.focus();
-      editorRef.current.selectionEnd = start;
-      handleContentChangeCallback(editorRef.current.value);
-      updateEditorHeight();
-    },
-    setContent: (text: string) => {
-      if (editorRef.current) {
-        editorRef.current.value = text;
-        handleContentChangeCallback(editorRef.current.value);
-        updateEditorHeight();
-      }
-    },
-    getContent: (): string => {
-      return editorRef.current?.value ?? "";
-    },
-    getCursorPosition: (): number => {
-      return editorRef.current?.selectionStart ?? 0;
-    },
-    getSelectedContent: () => {
-      const start = editorRef.current?.selectionStart;
-      const end = editorRef.current?.selectionEnd;
-      return editorRef.current?.value.slice(start, end) ?? "";
-    },
-    setCursorPosition: (startPos: number, endPos?: number) => {
-      const _endPos = isNaN(endPos as number) ? startPos : (endPos as number);
-      editorRef.current?.setSelectionRange(startPos, _endPos);
-    },
-    getCursorLineNumber: () => {
-      const cursorPosition = editorRef.current?.selectionStart ?? 0;
-      const lines = editorRef.current?.value.slice(0, cursorPosition).split("\n") ?? [];
-      return lines.length - 1;
-    },
-    getLine: (lineNumber: number) => {
-      return editorRef.current?.value.split("\n")[lineNumber] ?? "";
-    },
-    setLine: (lineNumber: number, text: string) => {
-      const lines = editorRef.current?.value.split("\n") ?? [];
-      lines[lineNumber] = text;
-      if (editorRef.current) {
-        editorRef.current.value = lines.join("\n");
-        editorRef.current.focus();
-        handleContentChangeCallback(editorRef.current.value);
-        updateEditorHeight();
-      }
-    },
-  };
+        editor.value = editor.value.slice(0, start) + editor.value.slice(start + length);
+        editor.focus();
+        editor.setSelectionRange(start, start);
+        updateContent();
+      },
+      setContent: (text: string) => {
+        const editor = editorRef.current;
+        if (editor) {
+          editor.value = text;
+          updateContent();
+        }
+      },
+      getContent: () => editorRef.current?.value ?? "",
+      getCursorPosition: () => editorRef.current?.selectionStart ?? 0,
+      getSelectedContent: () => {
+        const editor = editorRef.current;
+        if (!editor) return "";
+        return editor.value.slice(editor.selectionStart, editor.selectionEnd);
+      },
+      setCursorPosition: (startPos: number, endPos?: number) => {
+        const editor = editorRef.current;
+        if (!editor) return;
+        // setSelectionRange requires valid arguments; default to startPos if endPos is undefined
+        const endPosition = endPos !== undefined && !Number.isNaN(endPos) ? endPos : startPos;
+        editor.setSelectionRange(startPos, endPosition);
+      },
+      getCursorLineNumber: () => {
+        const editor = editorRef.current;
+        if (!editor) return 0;
+        const lines = editor.value.slice(0, editor.selectionStart).split("\n");
+        return lines.length - 1;
+      },
+      getLine: (lineNumber: number) => editorRef.current?.value.split("\n")[lineNumber] ?? "",
+      setLine: (lineNumber: number, text: string) => {
+        const editor = editorRef.current;
+        if (!editor) return;
+        const lines = editor.value.split("\n");
+        lines[lineNumber] = text;
+        editor.value = lines.join("\n");
+        editor.focus();
+        updateContent();
+      },
+    }),
+    [updateContent, scrollToCaret],
+  );
 
-  useImperativeHandle(ref, () => editorActions, []);
-
-  const updateEditorHeight = () => {
-    if (editorRef.current) {
-      editorRef.current.style.height = "auto";
-      editorRef.current.style.height = (editorRef.current.scrollHeight ?? 0) + "px";
-    }
-  };
+  useImperativeHandle(ref, () => editorActions, [editorActions]);
 
   const handleEditorInput = useCallback(() => {
-    handleContentChangeCallback(editorRef.current?.value ?? "");
+    if (editorRef.current) {
+      handleContentChangeCallback(editorRef.current.value);
+      updateEditorHeight();
+
+      // Auto-scroll to keep cursor visible when typing
+      // See: https://github.com/usememos/memos/issues/5469
+      scrollToCaret();
+    }
+  }, [handleContentChangeCallback, updateEditorHeight, scrollToCaret]);
+
+  // Auto-complete markdown lists when pressing Enter
+  useListCompletion({
+    editorRef,
+    editorActions,
+    isInIME,
+  });
+
+  const handleEditorPaste = useCallback(
+    (event: ClipboardEvent<HTMLTextAreaElement>) => {
+      const editor = editorRef.current;
+      const pastedText = event.clipboardData?.getData("text/plain") || event.clipboardData?.getData("text");
+      const markdownLink = editor ? getMarkdownLinkForPastedUrl(editorActions.getSelectedContent(), pastedText) : undefined;
+
+      if (markdownLink) {
+        event.preventDefault();
+        editorActions.insertText(markdownLink);
+        return;
+      }
+
+      onPaste(event);
+    },
+    [editorActions, onPaste],
+  );
+
+  // Recalculate editor height when focus mode changes
+  useEffect(() => {
     updateEditorHeight();
-  }, []);
-
-  const getLastNode = (nodes: Node[]): Node | undefined => {
-    const lastNode = last(nodes);
-    if (!lastNode) {
-      return undefined;
-    }
-    if (lastNode.type === NodeType.LIST) {
-      const children = lastNode.listNode?.children;
-      if (children) {
-        return getLastNode(children);
-      }
-    }
-    return lastNode;
-  };
-
-  const handleEditorKeyDown = async (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key === "Enter" && !isInIME) {
-      if (event.shiftKey || event.ctrlKey || event.metaKey || event.altKey) {
-        return;
-      }
-
-      const cursorPosition = editorActions.getCursorPosition();
-      const prevContent = editorActions.getContent().substring(0, cursorPosition);
-      const { nodes } = await markdownServiceClient.parseMarkdown({ markdown: prevContent });
-      const lastNode = getLastNode(nodes);
-      if (!lastNode) {
-        return;
-      }
-
-      // Get the indentation of the previous line
-      const lines = prevContent.split("\n");
-      const lastLine = lines[lines.length - 1];
-      const indentationMatch = lastLine.match(/^\s*/);
-      let insertText = indentationMatch ? indentationMatch[0] : ""; // Keep the indentation of the previous line
-      if (lastNode.type === NodeType.TASK_LIST_ITEM) {
-        const { symbol } = lastNode.taskListItemNode as TaskListItemNode;
-        insertText += `${symbol} [ ] `;
-      } else if (lastNode.type === NodeType.UNORDERED_LIST_ITEM) {
-        const { symbol } = lastNode.unorderedListItemNode as UnorderedListItemNode;
-        insertText += `${symbol} `;
-      } else if (lastNode.type === NodeType.ORDERED_LIST_ITEM) {
-        const { number } = lastNode.orderedListItemNode as OrderedListItemNode;
-        insertText += `${Number(number) + 1}. `;
-      } else if (lastNode.type === NodeType.TABLE) {
-        const columns = lastNode.tableNode?.header.length;
-        if (!columns) {
-          return;
-        }
-
-        insertText += "| ";
-        for (let i = 1; i < columns; i++) {
-          insertText += " | ";
-        }
-        insertText += " |";
-      }
-
-      if (insertText) {
-        // Insert the text at the current cursor position.
-        editorActions.insertText(insertText);
-      }
-    }
-  };
+  }, [isFocusMode, updateEditorHeight]);
 
   return (
     <div
-      className={cn("flex flex-col justify-start items-start relative w-full h-auto max-h-[50vh] bg-inherit dark:text-gray-300", className)}
+      className={cn(
+        "flex flex-col justify-start items-start relative w-full bg-inherit",
+        // Focus mode: flex-1 to grow and fill space; Normal: h-auto with max-height
+        isFocusMode ? "flex-1" : `h-auto ${EDITOR_HEIGHT.normal}`,
+        className,
+      )}
     >
       <textarea
-        className="w-full h-full my-1 text-base resize-none overflow-x-hidden overflow-y-auto bg-transparent outline-none whitespace-pre-wrap break-words"
-        rows={2}
+        className={cn(
+          "w-full text-base resize-none overflow-x-hidden overflow-y-auto bg-transparent outline-none placeholder:opacity-70 whitespace-pre-wrap wrap-break-word",
+          // Focus mode: flex-1 h-0 to grow within flex container; Normal: h-full to fill wrapper
+          isFocusMode ? "flex-1 h-0" : "h-full",
+        )}
+        rows={1}
         placeholder={placeholder}
         ref={editorRef}
-        onPaste={onPaste}
+        onPaste={handleEditorPaste}
         onInput={handleEditorInput}
-        onKeyDown={handleEditorKeyDown}
-        onCompositionStart={() => setIsInIME(true)}
-        onCompositionEnd={() => setTimeout(() => setIsInIME(false))}
+        onCompositionStart={onCompositionStart}
+        onCompositionEnd={onCompositionEnd}
       ></textarea>
       <TagSuggestions editorRef={editorRef} editorActions={ref} />
+      <SlashCommands editorRef={editorRef} editorActions={ref} commands={editorCommands} />
     </div>
   );
 });

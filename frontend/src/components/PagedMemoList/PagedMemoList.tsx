@@ -1,123 +1,77 @@
-import { Button } from "@/components/ui/mui";
-import { ArrowUpIcon, LoaderIcon } from "lucide-react";
-import { observer } from "mobx-react-lite";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { matchPath } from "react-router-dom";
-import PullToRefresh from "react-simple-pull-to-refresh";
+import { useQueryClient } from "@tanstack/react-query";
+import { ArrowUpIcon } from "lucide-react";
+import { type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { MentionResolutionProvider } from "@/components/MemoContent/MentionResolutionContext";
+import { deriveDefaultCreateTimeFromFilters } from "@/components/MemoEditor/utils/deriveDefaultCreateTime";
+import { Button } from "@/components/ui/button";
+import { userServiceClient } from "@/connect";
+import { useMemoFilterContext } from "@/contexts/MemoFilterContext";
 import { DEFAULT_LIST_MEMOS_PAGE_SIZE } from "@/helpers/consts";
-import useCurrentUser from "@/hooks/useCurrentUser";
-import useResponsiveWidth from "@/hooks/useResponsiveWidth";
-import { Routes } from "@/router";
-import { memoStore, viewStore } from "@/store/v2";
-import { Direction, State } from "@/types/proto/api/v1/common";
-import { Memo } from "@/types/proto/api/v1/memo_service";
+import { useInfiniteMemos } from "@/hooks/useMemoQueries";
+import { userKeys } from "@/hooks/useUserQueries";
+import { State } from "@/types/proto/api/v1/common_pb";
+import type { Memo } from "@/types/proto/api/v1/memo_service_pb";
 import { useTranslate } from "@/utils/i18n";
-import Empty from "../Empty";
-import MasonryView from "../MasonryView";
 import MemoEditor from "../MemoEditor";
+import MemoFilters from "../MemoFilters";
+import Placeholder from "../Placeholder";
+import Skeleton from "../Skeleton";
 
 interface Props {
-  renderer: (memo: Memo) => JSX.Element;
+  renderer: (memo: Memo) => ReactElement;
   listSort?: (list: Memo[]) => Memo[];
-  owner?: string;
   state?: State;
-  direction?: Direction;
+  orderBy?: string;
   filter?: string;
-  oldFilter?: string;
   pageSize?: number;
+  showCreator?: boolean;
+  enabled?: boolean;
+  /** When true, render the inline MemoEditor above the list (e.g. on the Home page). */
+  showMemoEditor?: boolean;
 }
 
-const PagedMemoList = observer((props: Props) => {
-  const t = useTranslate();
-  const { md } = useResponsiveWidth();
-
-  // Simplified state management - separate state variables for clarity
-  const [isRequesting, setIsRequesting] = useState(true);
-  const [nextPageToken, setNextPageToken] = useState("");
-
-  // Ref to manage auto-fetch timeout to prevent memory leaks
+function useAutoFetchWhenNotScrollable({
+  hasNextPage,
+  isFetchingNextPage,
+  memoCount,
+  onFetchNext,
+}: {
+  hasNextPage: boolean | undefined;
+  isFetchingNextPage: boolean;
+  memoCount: number;
+  onFetchNext: () => Promise<unknown>;
+}) {
   const autoFetchTimeoutRef = useRef<number | null>(null);
 
-  // Apply custom sorting if provided, otherwise use store memos directly
-  const sortedMemoList = props.listSort ? props.listSort(memoStore.state.memos) : memoStore.state.memos;
-
-  // Show memo editor only on the root route
-  const showMemoEditor = Boolean(matchPath(Routes.ROOT, window.location.pathname));
-
-  // Fetch more memos with pagination support
-  const fetchMoreMemos = async (pageToken: string) => {
-    setIsRequesting(true);
-
-    try {
-      const fetchParams: any = {
-        state: props.state || State.NORMAL,
-        direction: props.direction || Direction.DESC,
-        filter: props.filter || "",
-        oldFilter: props.oldFilter || "",
-        pageSize: props.pageSize || DEFAULT_LIST_MEMOS_PAGE_SIZE,
-        pageToken,
-      };
-      if (props.owner) {
-        // 将 owner 格式 "users/1" 转换为后端API期望的 creatorId "1"
-        const creatorId = props.owner.replace('users/', '');
-        fetchParams.creatorId = creatorId;
-      }
-      const response = await memoStore.fetchMemos(fetchParams);
-      setNextPageToken(response?.nextPageToken || "");
-    } finally {
-      setIsRequesting(false);
-    }
-  };
-
-  // Helper function to check if page has enough content to be scrollable
-  const isPageScrollable = () => {
+  const isPageScrollable = useCallback(() => {
     const documentHeight = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
-    return documentHeight > window.innerHeight + 100; // 100px buffer for safe measure
-  };
+    return documentHeight > window.innerHeight + 100;
+  }, []);
 
-  // Auto-fetch more content if page isn't scrollable and more data is available
   const checkAndFetchIfNeeded = useCallback(async () => {
-    // Clear any pending auto-fetch timeout
     if (autoFetchTimeoutRef.current) {
       clearTimeout(autoFetchTimeoutRef.current);
     }
 
-    // Wait for DOM to update before checking scrollability
     await new Promise((resolve) => setTimeout(resolve, 200));
 
-    // Only fetch if: page isn't scrollable, we have more data, not currently loading, and have memos
-    const shouldFetch = !isPageScrollable() && nextPageToken && !isRequesting && sortedMemoList.length > 0;
+    const shouldFetch = !isPageScrollable() && hasNextPage && !isFetchingNextPage && memoCount > 0;
 
     if (shouldFetch) {
-      await fetchMoreMemos(nextPageToken);
+      await onFetchNext();
 
-      // Schedule another check with delay to prevent rapid successive calls
       autoFetchTimeoutRef.current = window.setTimeout(() => {
-        checkAndFetchIfNeeded();
+        void checkAndFetchIfNeeded();
       }, 500);
     }
-  }, [nextPageToken, isRequesting, sortedMemoList.length]);
+  }, [hasNextPage, isFetchingNextPage, memoCount, isPageScrollable, onFetchNext]);
 
-  // Refresh the entire memo list from the beginning
-  const refreshList = async () => {
-    memoStore.state.updateStateId();
-    setNextPageToken("");
-    await fetchMoreMemos("");
-  };
-
-  // Initial load and reload when props change
   useEffect(() => {
-    refreshList();
-  }, [props.owner, props.state, props.direction, props.filter, props.oldFilter, props.pageSize]);
-
-  // Auto-fetch more content when list changes and page isn't full
-  useEffect(() => {
-    if (!isRequesting && sortedMemoList.length > 0) {
-      checkAndFetchIfNeeded();
+    if (!isFetchingNextPage && memoCount > 0) {
+      void checkAndFetchIfNeeded();
     }
-  }, [sortedMemoList.length, isRequesting, nextPageToken, checkAndFetchIfNeeded]);
+  }, [memoCount, isFetchingNextPage, checkAndFetchIfNeeded]);
 
-  // Cleanup timeout on component unmount
   useEffect(() => {
     return () => {
       if (autoFetchTimeoutRef.current) {
@@ -125,78 +79,117 @@ const PagedMemoList = observer((props: Props) => {
       }
     };
   }, []);
+}
+
+const PagedMemoList = (props: Props) => {
+  const t = useTranslate();
+  const queryClient = useQueryClient();
+  const { filters } = useMemoFilterContext();
+
+  const showMemoEditor = props.showMemoEditor ?? false;
+  const defaultCreateTime = useMemo(() => deriveDefaultCreateTimeFromFilters(filters), [filters]);
+
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } = useInfiniteMemos(
+    {
+      state: props.state || State.NORMAL,
+      orderBy: props.orderBy || "create_time desc",
+      filter: props.filter,
+      pageSize: props.pageSize || DEFAULT_LIST_MEMOS_PAGE_SIZE,
+    },
+    { enabled: props.enabled ?? true },
+  );
+
+  // Flatten pages into a single array of memos
+  const memos = useMemo(() => data?.pages.flatMap((page) => page.memos) || [], [data]);
+
+  // Apply custom sorting if provided, otherwise use memos directly
+  const sortedMemoList = useMemo(() => (props.listSort ? props.listSort(memos) : memos), [memos, props.listSort]);
+
+  // Prefetch creators when new data arrives to improve performance
+  useEffect(() => {
+    if (!data?.pages || !props.showCreator) return;
+
+    const lastPage = data.pages[data.pages.length - 1];
+    if (!lastPage?.memos) return;
+
+    const uniqueCreators = Array.from(new Set(lastPage.memos.map((memo) => memo.creator)));
+    for (const creator of uniqueCreators) {
+      void queryClient.prefetchQuery({
+        queryKey: userKeys.detail(creator),
+        queryFn: async () => {
+          const user = await userServiceClient.getUser({ name: creator });
+          return user;
+        },
+        staleTime: 1000 * 60 * 5,
+      });
+    }
+  }, [data?.pages, props.showCreator, queryClient]);
+
+  // Auto-fetch hook: fetches more content when page isn't scrollable
+  useAutoFetchWhenNotScrollable({
+    hasNextPage,
+    isFetchingNextPage,
+    memoCount: sortedMemoList.length,
+    onFetchNext: fetchNextPage,
+  });
 
   // Infinite scroll: fetch more when user scrolls near bottom
   useEffect(() => {
-    if (!nextPageToken) return;
+    if (!hasNextPage) return;
 
     const handleScroll = () => {
       const nearBottom = window.innerHeight + window.scrollY >= document.body.offsetHeight - 300;
-      if (nearBottom && !isRequesting) {
-        fetchMoreMemos(nextPageToken);
+      if (nearBottom && !isFetchingNextPage) {
+        fetchNextPage();
       }
     };
 
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
-  }, [nextPageToken, isRequesting]);
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const children = (
-    <div className="flex flex-col justify-start items-start w-full max-w-full">
-      <MasonryView
-        memoList={sortedMemoList}
-        renderer={props.renderer}
-        prefixElement={showMemoEditor ? <MemoEditor className="mb-2" cacheKey="home-memo-editor" /> : undefined}
-        listMode={viewStore.state.layout === "LIST"}
-      />
+    <MentionResolutionProvider contents={sortedMemoList.map((memo) => memo.content)}>
+      <div className="flex flex-col justify-start w-full max-w-2xl mx-auto">
+        {/* Show skeleton loader during initial load */}
+        {isLoading ? (
+          <Skeleton showCreator={props.showCreator} count={4} />
+        ) : (
+          <>
+            {showMemoEditor ? (
+              <MemoEditor
+                className="mb-2"
+                cacheKey="home-memo-editor"
+                placeholder={t("editor.any-thoughts")}
+                defaultCreateTime={defaultCreateTime}
+              />
+            ) : null}
+            <MemoFilters />
+            {sortedMemoList.map((memo) => props.renderer(memo))}
 
-      {/* Loading indicator */}
-      {isRequesting && (
-        <div className="w-full flex flex-row justify-center items-center my-4">
-          <LoaderIcon className="animate-spin text-zinc-500" />
-        </div>
-      )}
+            {/* Loading indicator for pagination */}
+            {isFetchingNextPage && <Skeleton showCreator={props.showCreator} count={2} />}
 
-      {/* Empty state or back-to-top button */}
-      {!isRequesting && (
-        <>
-          {!nextPageToken && sortedMemoList.length === 0 ? (
-            <div className="w-full mt-12 mb-8 flex flex-col justify-center items-center italic">
-              <Empty />
-              <p className="mt-2 text-gray-600 dark:text-gray-400">{t("message.no-data")}</p>
-            </div>
-          ) : (
-            <div className="w-full opacity-70 flex flex-row justify-center items-center my-4">
-              <BackToTop />
-            </div>
-          )}
-        </>
-      )}
-    </div>
+            {/* Empty state or back-to-top button */}
+            {!isFetchingNextPage && (
+              <>
+                {!hasNextPage && sortedMemoList.length === 0 ? (
+                  <Placeholder variant="empty" message={t("message.no-data")} />
+                ) : (
+                  <div className="w-full opacity-70 flex flex-row justify-center items-center my-4">
+                    <BackToTop />
+                  </div>
+                )}
+              </>
+            )}
+          </>
+        )}
+      </div>
+    </MentionResolutionProvider>
   );
 
-  if (md) {
-    return children;
-  }
-
-  return (
-    <PullToRefresh
-      onRefresh={() => refreshList()}
-      pullingContent={
-        <div className="w-full flex flex-row justify-center items-center my-4">
-          <LoaderIcon className="opacity-60" />
-        </div>
-      }
-      refreshingContent={
-        <div className="w-full flex flex-row justify-center items-center my-4">
-          <LoaderIcon className="animate-spin" />
-        </div>
-      }
-    >
-      {children}
-    </PullToRefresh>
-  );
-});
+  return children;
+};
 
 const BackToTop = () => {
   const t = useTranslate();
@@ -225,7 +218,7 @@ const BackToTop = () => {
   }
 
   return (
-    <Button variant="plain" onClick={scrollToTop}>
+    <Button variant="ghost" onClick={scrollToTop}>
       {t("router.back-to-top")}
       <ArrowUpIcon className="ml-1 w-4 h-auto" />
     </Button>

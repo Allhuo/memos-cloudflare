@@ -5,6 +5,7 @@ import { findNearestMatchedLanguage } from "./utils/i18n";
 
 export const locales = orderBy([
   "ar",
+  "ca",
   "cs",
   "de",
   "en",
@@ -12,6 +13,7 @@ export const locales = orderBy([
   "es",
   "fa",
   "fr",
+  "gl",
   "hi",
   "hr",
   "hu",
@@ -49,11 +51,17 @@ const LazyImportPlugin: BackendModule = {
   read: function (language, _, callback) {
     const matchedLanguage = findNearestMatchedLanguage(language);
     import(`./locales/${matchedLanguage}.json`)
-      .then((translation: any) => {
-        callback(null, translation);
+      .then((translationModule: Record<string, unknown>) => {
+        callback(null, (translationModule.default as Record<string, unknown>) ?? translationModule);
       })
       .catch(() => {
-        // Fallback to English.
+        import("./locales/en.json")
+          .then((translationModule: Record<string, unknown>) => {
+            callback(null, (translationModule.default as Record<string, unknown>) ?? translationModule);
+          })
+          .catch((error: unknown) => {
+            callback(error as Error, false);
+          });
       });
   },
 };
@@ -64,6 +72,9 @@ i18n
   .init({
     detection: {
       order: ["navigator"],
+    },
+    interpolation: {
+      escapeValue: false,
     },
     fallbackLng: {
       ...fallbacks,

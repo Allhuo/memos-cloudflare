@@ -11,6 +11,9 @@ import { resourceRoutes } from './routes/resource';
 import { workspaceRoutes } from './routes/workspace';
 import { webhookRoutes } from './routes/webhook';
 import { authMiddleware } from './middleware/auth';
+import { mountConnectRoutes } from './v2/router';
+import { mountFileServer } from './v2/fileserver';
+import './v2/services';
 
 // 导入环境类型
 import { Env } from './types';
@@ -46,7 +49,9 @@ app.use('*', cors({
     return origin || envOrigins[0] || allowedOrigins[0];
   },
   allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowHeaders: ['Content-Type', 'Authorization', 'X-Request-Id'],
+  // Connect-Protocol-Version / Connect-Timeout-Ms 为 @connectrpc/connect-web 必发头，
+  // X-Retry 为前端 401 重试标记——缺一个都会导致浏览器 CORS 预检失败
+  allowHeaders: ['Content-Type', 'Authorization', 'X-Request-Id', 'Connect-Protocol-Version', 'Connect-Timeout-Ms', 'X-Retry'],
   exposeHeaders: ['X-Request-Id'],
   credentials: true,
   maxAge: 86400
@@ -65,6 +70,11 @@ app.get('/health', (c) => {
   });
 });
 
+// ===== v2: Connect JSON API（对齐上游 Memos v0.29，前端 v0.29.1 使用） =====
+mountConnectRoutes(app);
+mountFileServer(app);
+
+// ===== v1 legacy REST 路由（对应旧版 v0.24 前端，过渡期保留） =====
 // 先注册公开的路由
 app.route('/api/auth', authRoutes);
 
@@ -130,8 +140,13 @@ app.get('/o/r/:uid/:filename', async (c) => {
   }
 });
 
-// 404 处理
-app.notFound((c) => {
+// 404 处理：单 Worker 同源部署时回退到静态前端（SPA 路由如 /explore 返回 index.html）
+app.notFound(async (c) => {
+  if (c.env.ASSETS && c.req.method === 'GET') {
+    const res = await c.env.ASSETS.fetch(c.req.raw);
+    if (res.status !== 404) return res;
+    return c.env.ASSETS.fetch(new URL('/', c.req.url).toString());
+  }
   return c.json({ message: 'Not Found' }, 404);
 });
 
