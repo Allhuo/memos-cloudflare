@@ -11,7 +11,7 @@ export function mountFileServer(app: Hono<{ Bindings: Env }>) {
     const uid = c.req.param("uid");
 
     const row = await c.env.DB.prepare(
-      `SELECT a.id, a.uid, a.filename, a.type, a.size, a.blob_key, a.creator_id, m.visibility
+      `SELECT a.id, a.uid, a.filename, a.type, a.size, a.storage_type, a.reference, a.creator_id, m.visibility
        FROM attachment a LEFT JOIN memo m ON a.memo_id = m.id
        WHERE a.uid = ?`,
     )
@@ -22,7 +22,8 @@ export function mountFileServer(app: Hono<{ Bindings: Env }>) {
         filename: string;
         type: string;
         size: number;
-        blob_key: string | null;
+        storage_type: string;
+        reference: string;
         creator_id: number;
         visibility: string | null;
       }>();
@@ -37,8 +38,11 @@ export function mountFileServer(app: Hono<{ Bindings: Env }>) {
       }
     }
 
-    if (!row.blob_key || !c.env.R2) return c.text("file blob not available", 404);
-    const object = await c.env.R2.get(row.blob_key);
+    if (row.storage_type === "EXTERNAL" && row.reference) {
+      return c.redirect(row.reference, 302);
+    }
+    if (!row.reference || !c.env.R2) return c.text("file blob not available", 404);
+    const object = await c.env.R2.get(row.reference);
     if (!object) return c.text("file blob not found", 404);
 
     return new Response(object.body, {
