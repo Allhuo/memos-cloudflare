@@ -1,218 +1,135 @@
-# Memos Cloudflare 部署版本
+# Memos on Cloudflare
 
-基于 [Memos](https://github.com/usememos/memos) 的 Cloudflare 部署方案，使用 Cloudflare Workers + D1 + R2 技术栈。
+[![CI](https://github.com/Allhuo/memos-cloudflare/actions/workflows/ci.yml/badge.svg)](https://github.com/Allhuo/memos-cloudflare/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/Allhuo/memos-cloudflare)](https://github.com/Allhuo/memos-cloudflare/stargazers)
 
-## ✨ 特性
+English | [中文](README.zh-CN.md)
 
-- 🚀 **无服务器架构**: Cloudflare Workers 全球边缘部署
-- 🗄️ **D1 数据库**: 基于 SQLite 的分布式数据库  
-- 📁 **R2 存储**: 文件上传和存储支持
-- 🔐 **安全认证**: JWT 身份验证系统
-- 🌍 **CORS 支持**: 灵活的跨域配置
-- 🎯 **API 兼容**: 与原版 Memos v0.24.x 兼容
+Deploy [Memos](https://github.com/usememos/memos) — the open-source, self-hosted note-taking app — entirely on Cloudflare's free tier: **Workers** (backend) + **D1** (SQLite database) + **R2** (file storage) + **Pages** (frontend). No server, no Docker, no cost for personal use.
 
-## 🚀 快速部署
+## Why this project
 
-### 1. 克隆项目
+The official Memos requires a server running Docker. This project reimplements the Memos backend as a Cloudflare Worker so you can run your personal memo service on Cloudflare's global edge — free, fast, and maintenance-free.
+
+- 🚀 **Serverless**: global edge deployment via Cloudflare Workers
+- 🗄️ **D1 database**: SQLite-backed distributed storage
+- 📁 **R2 storage**: file/image upload support
+- 🔐 **JWT authentication** with configurable CORS
+- 🎯 **API compatible** with Memos v0.24.x (see [upstream status](#upstream-compatibility))
+
+## Quick start
+
+### 1. Clone
 
 ```bash
 git clone https://github.com/Allhuo/memos-cloudflare.git
 cd memos-cloudflare
 ```
 
-### 2. 后端部署
+### 2. Deploy the backend (Worker)
 
 ```bash
 cd backend
-
-# 安装依赖
 npm install
 
-# 创建 D1 数据库
+# Create the D1 database
 npx wrangler d1 create memos
 
-# 复制配置文件并更新数据库 ID
+# Copy the config template and fill in your database ID
 cp wrangler.toml.example wrangler.toml
-# 编辑 wrangler.toml，替换 YOUR_D1_DATABASE_ID 为实际的数据库 ID
 
-# 初始化数据库
+# Initialize the schema
 npx wrangler d1 execute memos --remote --file schema.sql
 
-# 设置环境变量
-npx wrangler secret put JWT_SECRET
-# 输入: 随机生成的 JWT 密钥
+# Set secrets
+npx wrangler secret put JWT_SECRET        # e.g. output of: openssl rand -base64 32
+npx wrangler secret put ALLOWED_ORIGINS   # e.g. https://your-frontend.pages.dev
 
-npx wrangler secret put ALLOWED_ORIGINS  
-# 输入: https://your-frontend-domain.pages.dev,https://your-custom-domain.com
-
-# 部署 Worker
+# Deploy
 npx wrangler deploy
 ```
 
-### 3. 前端部署
+### 3. Deploy the frontend (Pages)
 
-1. **连接 GitHub 到 Cloudflare Pages**
-   - 在 Cloudflare Dashboard 中创建 Pages 项目
-   - 连接你的 GitHub 仓库
-
-2. **配置构建设置**
+1. Create a Cloudflare Pages project connected to your fork
+2. Build settings:
    ```
    Framework preset: Vite
-   Root directory: frontend  
-   Build command: pnpm install && pnpm build
+   Root directory: frontend
+   Build command: npm install && npm run build
    Build output directory: dist
-   Node.js version: 18
+   Node.js version: 20
    ```
-
-3. **设置环境变量**
+3. Environment variable:
    ```
    VITE_API_BASE_URL=https://your-worker-name.your-subdomain.workers.dev
    ```
 
-## 🔑 默认登录
+### 4. Sign in
 
-- **用户名**: `admin`
-- **密码**: `123456`
+Default account: `admin` / `123456` — **change the password immediately after first login.**
 
-## ⚠️ 重要安全配置
+## Configuration
 
-### 环境变量说明
+| Variable | Where | Description |
+|----------|-------|-------------|
+| `JWT_SECRET` | Worker secret | JWT signing key (required, use a strong random value) |
+| `ALLOWED_ORIGINS` | Worker secret | Comma-separated list of allowed frontend origins |
+| `VITE_API_BASE_URL` | Pages env var | Backend Worker URL for the frontend |
 
-| 变量 | 位置 | 说明 |
-|------|------|------|
-| `JWT_SECRET` | Worker Secrets | JWT 签名密钥，必须设置 |
-| `ALLOWED_ORIGINS` | Worker Secrets | 允许的前端域名，逗号分隔 |
-| `VITE_API_BASE_URL` | Pages Environment | 前端 API 地址 |
+See [SECURITY.md](SECURITY.md) for the post-deployment security checklist.
 
-### 🔒 安全检查清单
+## Troubleshooting
 
-- [ ] 修改默认管理员密码
-- [ ] 设置强 JWT_SECRET
-- [ ] 配置正确的 ALLOWED_ORIGINS
-- [ ] 将 `wrangler.toml` 添加到 `.gitignore`（如果包含敏感信息）
+<details>
+<summary><b>Frontend shows "Failed to fetch"</b></summary>
 
-## 🛠️ 故障排除
+CORS misconfiguration. Check that `ALLOWED_ORIGINS` contains your exact frontend origin (no trailing slash), then redeploy the Worker.
+</details>
 
-### 前端显示 "Failed to fetch"
+<details>
+<summary><b>Cannot log in with admin / 123456</b></summary>
 
-**原因**: CORS 配置问题
-
-**解决方案**:
-1. 检查 `ALLOWED_ORIGINS` 是否包含前端域名
-2. 确保域名格式正确（不包含末尾斜杠）
-3. 重新部署 Worker
+If you initialized the database with a schema from before 2026-07, the seeded password hash was wrong ([#1](https://github.com/Allhuo/memos-cloudflare/issues/1), fixed since). Reset it:
 
 ```bash
-# 重新设置 ALLOWED_ORIGINS
-npx wrangler secret put ALLOWED_ORIGINS
-# 输入正确的域名列表
-
-# 重新部署
-npx wrangler deploy
+npx wrangler d1 execute memos --remote --command "UPDATE user SET password_hash = '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92' WHERE username = 'admin'"
 ```
+</details>
 
-### 数据库连接错误
+<details>
+<summary><b>Database errors</b></summary>
 
-**解决方案**:
 ```bash
-# 检查数据库列表
-npx wrangler d1 list
-
-# 重新执行数据库迁移
-npx wrangler d1 execute memos --remote --file schema.sql
+npx wrangler d1 list                                          # verify the database exists
+npx wrangler d1 execute memos --remote --file schema.sql      # re-run migrations
 ```
+</details>
 
-### 认证失败
+## Upstream compatibility
 
-**解决方案**:
-```bash
-# 重新设置 JWT 密钥
-npx wrangler secret put JWT_SECRET
+This project currently targets the **Memos v0.24.x** API. Upstream Memos has since shipped v0.25–v0.29 with significant changes (session/refresh-token auth, `HOST` → `ADMIN` role rename, React Query frontend refactor, SSO identity linkage, link-preview APIs). Aligning with newer upstream versions is the main mid-term goal — see [ROADMAP.md](ROADMAP.md) and [#3](https://github.com/Allhuo/memos-cloudflare/issues/3). Help is very welcome.
 
-# 使用 SHA-256 格式的密码哈希
-npx wrangler d1 execute memos --remote --command "UPDATE user SET password = '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92' WHERE username = 'admin'"
-```
+## Contributing
 
-## 📁 项目结构
+Contributions of any size are welcome — bug reports, docs, translations, fixes, upstream alignment. Start with [CONTRIBUTING.md](CONTRIBUTING.md) and the [`good first issue`](https://github.com/Allhuo/memos-cloudflare/labels/good%20first%20issue) label, or open an issue to discuss what you'd like to work on.
+
+## Project structure
 
 ```
 memos-cloudflare/
-├── backend/                 # Cloudflare Worker 后端
-│   ├── src/                # 源代码
-│   ├── schema.sql          # 数据库结构
-│   ├── wrangler.toml       # Worker 配置
-│   └── wrangler.toml.example # 配置模板
-├── frontend/               # React 前端
-│   ├── src/               # 源代码
-│   └── dist/              # 构建输出
-└── .gitignore             # Git 忽略规则
+├── backend/           # Cloudflare Worker (Hono + D1 + R2)
+│   ├── src/
+│   └── schema.sql
+├── frontend/          # React + Vite (deployed on Cloudflare Pages)
+│   └── src/
+└── docs/              # Deployment guides
 ```
 
-## 🔄 本地开发
+## Credits & license
 
-### 后端开发
+- Based on [Memos](https://github.com/usememos/memos) by the usememos team (MIT)
+- Started from an early version of [vividmuse/memos-cloudflare](https://github.com/vividmuse/memos-cloudflare), since heavily rewritten
 
-```bash
-cd backend
-npm install
-npm run dev
-```
-
-### 前端开发
-
-```bash
-cd frontend  
-pnpm install
-pnpm dev
-```
-
-## 📊 API 端点
-
-### 认证
-- `POST /api/auth/signin` - 用户登录
-- `POST /api/auth/signup` - 用户注册（仅 HOST）
-
-### 笔记管理
-- `GET /api/memo` - 获取笔记列表
-- `POST /api/memo` - 创建笔记
-- `PATCH /api/memo/:id` - 更新笔记
-- `DELETE /api/memo/:id` - 删除笔记
-
-### 用户管理
-- `GET /api/user/me` - 获取当前用户
-- `PATCH /api/user/:id` - 更新用户
-
-### 工作区
-- `GET /api/workspace/profile` - 获取工作区配置
-- `GET /api/workspace/setting` - 获取设置
-
-## 🤝 贡献
-
-1. Fork 项目
-2. 创建功能分支
-3. 提交更改
-4. 发起 Pull Request
-
-## 📄 许可证
-
-基于原 [Memos](https://github.com/usememos/memos) 项目，遵循 MIT 许可证。
-
-## 🔗 相关链接
-
-- [Memos 官方项目](https://github.com/usememos/memos)
-- [Cloudflare Workers 文档](https://developers.cloudflare.com/workers/)
-- [Cloudflare D1 文档](https://developers.cloudflare.com/d1/)
-- [Cloudflare Pages 文档](https://developers.cloudflare.com/pages/) 
-## 📖 关于项目来源
-
-本项目基于 [vividmuse/memos-cloudflare](https://github.com/vividmuse/memos-cloudflare) 的早期版本进行开发。
-
-由于原项目处于不活跃维护状态，且存在一些功能限制和技术问题，我们在其基础上进行了：
-- 🔧 大量错误修复和稳定性改进
-- ⚡ 核心功能重写和性能优化  
-- 🆕 新功能开发和用户体验提升
-- 📚 完善的文档和部署指南
-
-本项目现已作为独立项目维护，致力于提供稳定可靠的 Memos Cloudflare 部署方案。
-
-感谢原作者 [@vividmuse](https://github.com/vividmuse) 提供的初始框架和灵感。
+[MIT](LICENSE)
