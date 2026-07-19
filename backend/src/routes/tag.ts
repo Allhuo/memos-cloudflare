@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
+import type { Env, Variables } from '../types';
 
-const tagRoutes = new Hono();
+const tagRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 // 获取用户的标签列表
 tagRoutes.get('/', async (c) => {
@@ -84,6 +85,10 @@ tagRoutes.post('/', async (c) => {
     const newTag = await c.env.DB.prepare(
       'SELECT * FROM tag WHERE id = ?'
     ).bind(result.meta.last_row_id).first();
+
+    if (!newTag) {
+      throw new Error('Failed to load created tag');
+    }
 
     return c.json({
       id: newTag.id,
