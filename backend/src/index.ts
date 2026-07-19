@@ -49,7 +49,9 @@ app.use('*', cors({
     return origin || envOrigins[0] || allowedOrigins[0];
   },
   allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowHeaders: ['Content-Type', 'Authorization', 'X-Request-Id'],
+  // Connect-Protocol-Version / Connect-Timeout-Ms 为 @connectrpc/connect-web 必发头，
+  // X-Retry 为前端 401 重试标记——缺一个都会导致浏览器 CORS 预检失败
+  allowHeaders: ['Content-Type', 'Authorization', 'X-Request-Id', 'Connect-Protocol-Version', 'Connect-Timeout-Ms', 'X-Retry'],
   exposeHeaders: ['X-Request-Id'],
   credentials: true,
   maxAge: 86400
