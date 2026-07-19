@@ -29,8 +29,10 @@ export function rpc(service: string, method: string, auth: AuthPolicy, handler: 
 
 /** 挂载 Connect JSON 路由。所有 RPC 都是 POST /memos.api.v1.<Service>/<Method> */
 export function mountConnectRoutes(app: Hono<{ Bindings: Env }>) {
-  app.post("/memos.api.v1.:service/:method", async (c) => {
-    const key = `memos.api.v1.${c.req.param("service")}/${c.req.param("method")}`;
+  // 路径形如 /memos.api.v1.MemoService/ListMemos。“.”不是段分隔符，
+  // Hono 段内不支持静态前缀混写，这里用段内正则参数匹配整个 service 全名。
+  app.post("/:service{memos\\.api\\.v1\\.[A-Za-z]+}/:method", async (c) => {
+    const key = `${c.req.param("service")}/${c.req.param("method")}`;
     const registration = registry.get(key);
 
     try {
