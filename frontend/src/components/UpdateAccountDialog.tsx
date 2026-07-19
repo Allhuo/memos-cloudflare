@@ -1,4 +1,4 @@
-import { Button, Input, Textarea } from "@usememos/mui";
+import { Button, Input, Textarea } from "@/components/ui/mui";
 import { isEqual } from "lodash-es";
 import { XIcon } from "lucide-react";
 import { useState } from "react";

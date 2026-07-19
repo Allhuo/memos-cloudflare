@@ -1,4 +1,4 @@
-import { Button } from "@usememos/mui";
+import { Button } from "@/components/ui/mui";
 import { ExternalLinkIcon, TrashIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";

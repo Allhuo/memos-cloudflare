@@ -1,4 +1,4 @@
-import { Button } from "@usememos/mui";
+import { Button } from "@/components/ui/mui";
 import { XIcon } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { generateDialog } from "./Dialog";

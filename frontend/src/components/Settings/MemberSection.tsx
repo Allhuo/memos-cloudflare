@@ -1,5 +1,5 @@
 import { Radio, RadioGroup } from "@mui/joy";
-import { Button, Input } from "@usememos/mui";
+import { Button, Input } from "@/components/ui/mui";
 import { sortBy } from "lodash-es";
 import { MoreVerticalIcon } from "lucide-react";
 import { observer } from "mobx-react-lite";

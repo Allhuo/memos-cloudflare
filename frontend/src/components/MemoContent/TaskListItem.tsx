@@ -1,4 +1,4 @@
-import { Checkbox } from "@usememos/mui";
+import { Checkbox } from "@/components/ui/mui";
 import { observer } from "mobx-react-lite";
 import { useContext } from "react";
 import { markdownServiceClient } from "@/grpcweb";

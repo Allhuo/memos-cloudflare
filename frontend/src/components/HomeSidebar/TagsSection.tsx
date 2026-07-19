@@ -1,4 +1,4 @@
-import { Switch } from "@usememos/mui";
+import { Switch } from "@/components/ui/mui";
 import { Edit3Icon, HashIcon, MoreVerticalIcon, TagsIcon, TrashIcon } from "lucide-react";
 import { observer } from "mobx-react-lite";
 import toast from "react-hot-toast";

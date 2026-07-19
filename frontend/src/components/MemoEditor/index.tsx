@@ -1,4 +1,4 @@
-import { Button } from "@usememos/mui";
+import { Button } from "@/components/ui/mui";
 import copy from "copy-to-clipboard";
 import { isEqual } from "lodash-es";
 import { LoaderIcon, SendIcon } from "lucide-react";

@@ -1,5 +1,5 @@
 import { Chip, ChipDelete } from "@mui/joy";
-import { Button, Input, Switch } from "@usememos/mui";
+import { Button, Input, Switch } from "@/components/ui/mui";
 import { isEqual, uniq } from "lodash-es";
 import { CheckIcon } from "lucide-react";
 import { observer } from "mobx-react-lite";

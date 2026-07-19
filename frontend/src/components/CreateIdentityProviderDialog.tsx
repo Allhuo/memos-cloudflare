@@ -1,5 +1,5 @@
 import { Divider, Option, Select, Typography } from "@mui/joy";
-import { Button, Input } from "@usememos/mui";
+import { Button, Input } from "@/components/ui/mui";
 import { XIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "react-hot-toast";

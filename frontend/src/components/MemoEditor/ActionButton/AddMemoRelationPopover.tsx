@@ -1,5 +1,5 @@
 import { Autocomplete, AutocompleteOption, Chip } from "@mui/joy";
-import { Button, Checkbox } from "@usememos/mui";
+import { Button, Checkbox } from "@/components/ui/mui";
 import { uniqBy } from "lodash-es";
 import { LinkIcon } from "lucide-react";
 import React, { useContext, useState } from "react";

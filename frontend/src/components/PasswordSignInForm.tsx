@@ -1,4 +1,4 @@
-import { Button, Checkbox, Input } from "@usememos/mui";
+import { Button, Checkbox, Input } from "@/components/ui/mui";
 import { LoaderIcon } from "lucide-react";
 import { observer } from "mobx-react-lite";
 import { ClientError } from "nice-grpc-web";

@@ -1,5 +1,5 @@
 import { Divider, List, ListItem } from "@mui/joy";
-import { Button } from "@usememos/mui";
+import { Button } from "@/components/ui/mui";
 import { MoreVerticalIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "react-hot-toast";

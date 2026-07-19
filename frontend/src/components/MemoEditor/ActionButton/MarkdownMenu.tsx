@@ -1,5 +1,5 @@
 import { Link } from "@mui/joy";
-import { Button } from "@usememos/mui";
+import { Button } from "@/components/ui/mui";
 import { CheckSquareIcon, Code2Icon, SquareSlashIcon } from "lucide-react";
 import { useTranslate } from "@/utils/i18n";
 import { Popover, PopoverContent, PopoverTrigger } from "../../ui/Popover";

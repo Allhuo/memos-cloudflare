@@ -1,5 +1,5 @@
 import { Divider } from "@mui/joy";
-import { Button } from "@usememos/mui";
+import { Button } from "@/components/ui/mui";
 import { observer } from "mobx-react-lite";
 import { useEffect, useState } from "react";
 import { toast } from "react-hot-toast";

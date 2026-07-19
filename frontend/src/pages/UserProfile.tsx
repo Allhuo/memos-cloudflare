@@ -1,4 +1,4 @@
-import { Button } from "@usememos/mui";
+import { Button } from "@/components/ui/mui";
 import copy from "copy-to-clipboard";
 import dayjs from "dayjs";
 import { ExternalLinkIcon } from "lucide-react";

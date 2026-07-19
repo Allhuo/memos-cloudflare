@@ -1,4 +1,4 @@
-import { Button } from "@usememos/mui";
+import { Button } from "@/components/ui/mui";
 import { LoaderIcon, PaperclipIcon } from "lucide-react";
 import { observer } from "mobx-react-lite";
 import { useContext, useRef, useState } from "react";

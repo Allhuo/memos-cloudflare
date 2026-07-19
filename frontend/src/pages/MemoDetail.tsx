@@ -1,4 +1,4 @@
-import { Button } from "@usememos/mui";
+import { Button } from "@/components/ui/mui";
 import { ArrowUpLeftFromCircleIcon, MessageCircleIcon } from "lucide-react";
 import { observer } from "mobx-react-lite";
 import { ClientError } from "nice-grpc-web";

@@ -1,4 +1,4 @@
-import { Button } from "@usememos/mui";
+import { Button } from "@/components/ui/mui";
 import { MoreVerticalIcon, PenLineIcon } from "lucide-react";
 import useCurrentUser from "@/hooks/useCurrentUser";
 import { useTranslate } from "@/utils/i18n";

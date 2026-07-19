@@ -10,7 +10,7 @@ import { initialUserStore } from "./store/v2/user";
 import { initialWorkspaceStore } from "./store/v2/workspace";
 import "./style.css";
 import theme from "./theme";
-import "@usememos/mui/dist/index.css";
+import "@usememos/mui/theme.css";
 import "leaflet/dist/leaflet.css";
 
 // Version identification for deployment debugging
